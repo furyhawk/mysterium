@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mysterium — RAG Research Platform</title>
+  <link rel="stylesheet" href="/ui/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🔬</text></svg>" />
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-brand">
+      <span class="nav-logo">🔬</span>
+      <span class="nav-title">Mysterium</span>
+    </div>
+    <div class="nav-subtitle">RAG + Deep Research</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="upload">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        </svg>
+        Upload
+      </button>
+      <button class="nav-tab" data-tab="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        Search
+      </button>
+      <button class="nav-tab" data-tab="research">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        Research
+      </button>
+    </div>
+    <div class="nav-status" id="navStatus"></div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ─── Upload Tab ─── -->
+    <section class="tab-panel active" id="tab-upload">
+      <div class="card">
+        <h2 class="card-title">Upload Documents</h2>
+        <p class="card-desc">Upload documents to the RAG store. Supported: PDF, DOCX, TXT, Markdown.</p>
+
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-zone-content">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            <p class="upload-text">Drop files here or click to upload</p>
+            <p class="upload-hint">PDF, DOCX, TXT, MD — up to 50MB</p>
+            <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md" hidden />
+          </div>
+        </div>
+
+        <div class="upload-options">
+          <label class="field-label">
+            Collection
+            <select id="uploadCollection" class="field-select">
+              <option value="documents">documents</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="uploadProgress" class="upload-progress hidden"></div>
+        <div id="uploadResults" class="upload-results"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Documents</h2>
+        <div class="doc-toolbar">
+          <select id="docFilterCollection" class="field-select">
+            <option value="">All collections</option>
+          </select>
+          <button class="btn btn-sm" id="refreshDocs">⟳ Refresh</button>
+        </div>
+        <div id="docList" class="doc-list">
+          <div class="empty-state">No documents uploaded yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Search Tab ─── -->
+    <section class="tab-panel" id="tab-search">
+      <div class="card">
+        <h2 class="card-title">Search Documents</h2>
+        <p class="card-desc">Search across your document collections using vector + hybrid search.</p>
+
+        <div class="search-bar">
+          <input type="text" id="searchQuery" class="field-input search-input"
+                 placeholder="Search your documents…" />
+          <button class="btn btn-primary" id="searchBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            Search
+          </button>
+        </div>
+
+        <div class="search-options">
+          <label class="field-label">
+            Collection
+            <select id="searchCollection" class="field-select">
+              <option value="documents">documents</option>
+            </select>
+          </label>
+          <label class="field-label">
+            Results
+            <input type="number" id="searchLimit" class="field-input field-input-sm" value="5" min="1" max="50" />
+          </label>
+          <label class="field-label toggle-label">
+            <input type="checkbox" id="searchRerank" />
+            <span>Rerank</span>
+          </label>
+        </div>
+
+        <div id="searchResults" class="search-results"></div>
+      </div>
+    </section>
+
+    <!-- ─── Research Tab ─── -->
+    <section class="tab-panel" id="tab-research">
+      <div class="card">
+        <h2 class="card-title">Generate Research Report</h2>
+        <p class="card-desc">
+          Synthesize a structured research report from RAG documents and LLM analysis.
+          Uses <strong>pydantic-deep</strong> agents for structured synthesis.
+        </p>
+
+        <div class="research-bar">
+          <input type="text" id="researchQuery" class="field-input research-input"
+                 placeholder="What would you like to research?" />
+          <button class="btn btn-primary" id="researchBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            Generate
+          </button>
+        </div>
+
+        <div class="research-options">
+          <label class="field-label">
+            Collection
+            <select id="researchCollection" class="field-select">
+              <option value="documents">documents</option>
+            </select>
+          </label>
+          <label class="field-label">
+            RAG Results
+            <input type="number" id="researchLimit" class="field-input field-input-sm" value="10" min="1" max="50" />
+          </label>
+          <label class="field-label">
+            Model
+            <select id="researchModel" class="field-select">
+              <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+              <option value="claude-opus-4-20250514">Claude Opus 4</option>
+              <option value="claude-haiku-4-20250514">Claude Haiku 4</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="researchStatus" class="research-status hidden">
+          <div class="spinner"></div>
+          <span id="researchStatusText">Searching documents and generating report…</span>
+        </div>
+
+        <div id="researchResults" class="research-results"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/ui/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+[project]
+name = "mysterium"
+version = "0.1.0"
+description = "RAG-powered research platform — upload documents, search with verity-rag, and synthesize reports with pydantic-deep agents"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=0.117.0",
+    "fastapi==0.115.6",
+    "httpx>=0.28.1",
+    "pydantic-ai-slim>=2.14.1",
+    "pydantic-deep>=0.3.20",
+    "pydantic-settings>=2.14.2",
+    "uvicorn>=0.51.0",
+    "verity-rag>=0.1.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/furyhawk/mysterium"
+Repository = "https://github.com/furyhawk/mysterium"
+
+[project.scripts]
+mysterium = "mysterium.main:main"

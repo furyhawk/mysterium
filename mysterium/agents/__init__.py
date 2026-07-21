@@ -217,7 +217,7 @@ async def generate_research_report(
         base_url=base_url if base_url else None,
     )
 
-    response = await client.beta.messages.with_raw_types.create(
+    response = await client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=[{"type": "text", "text": system_prompt}],
@@ -237,7 +237,9 @@ async def generate_research_report(
                 "input_schema": ResearchReport.model_json_schema(),
             }
         ],
-        tool_choice={"type": "tool", "name": "submit_report"},
+        # "any" forces tool use without naming a specific tool (required for
+        # models with extended thinking — "tool" + name is not supported)
+        tool_choice={"type": "any"},
     )
 
     # 3. Parse the tool call output

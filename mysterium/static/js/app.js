@@ -337,9 +337,20 @@
       </div>
     `).join('');
 
+    const md = reportToMarkdown(report);
+
     container.innerHTML = `
       <div class="research-report">
-        <div class="report-title">${escapeHtml(report.title)}</div>
+        <div class="report-toolbar">
+          <span class="report-title">${escapeHtml(report.title)}</span>
+          <button class="btn btn-sm copy-btn" data-md="${escapeHtml(md)}" title="Copy as Markdown">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+            Copy Markdown
+          </button>
+        </div>
         ${report.summary ? `<div class="report-summary">${escapeHtml(report.summary).replace(/\n/g, '<br/>')}</div>` : ''}
         ${findings ? `<h3 style="margin-bottom:8px">🔑 Key Findings</h3><ul class="report-findings">${findings}</ul>` : ''}
         ${sections}
@@ -348,6 +359,83 @@
         ${report.generated_at ? `<p style="font-size:0.78rem;color:var(--text-muted);margin-top:16px">Generated: ${new Date(report.generated_at).toLocaleString()}</p>` : ''}
       </div>
     `;
+
+    // Copy-to-clipboard handler
+    const copyBtn = container.querySelector('.copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(copyBtn.dataset.md);
+          copyBtn.textContent = '✓ Copied!';
+          setTimeout(() => {
+            copyBtn.innerHTML = ''
+              + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+              + '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>'
+              + '<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>'
+              + '</svg> Copy Markdown';
+          }, 2000);
+        } catch {
+          toast('Failed to copy — browser may not support clipboard API', 'error');
+        }
+      });
+    }
+  }
+
+  function reportToMarkdown(report) {
+    const lines = [];
+
+    // Title
+    if (report.title) lines.push(`# ${report.title}\n`);
+
+    // Summary
+    if (report.summary) {
+      lines.push('## Summary\n');
+      lines.push(report.summary + '\n');
+    }
+
+    // Key findings
+    if (report.key_findings?.length) {
+      lines.push('## Key Findings\n');
+      report.key_findings.forEach(f => lines.push(`- ${f}`));
+      lines.push('');
+    }
+
+    // Sections
+    if (report.sections?.length) {
+      report.sections.forEach(sec => {
+        lines.push(`## ${sec.heading}\n`);
+        lines.push(sec.content + '\n');
+        if (sec.sources?.length) {
+          lines.push(`*Sources: ${sec.sources.join(', ')}*\n`);
+        }
+      });
+    }
+
+    // Knowledge gaps
+    if (report.gaps?.length) {
+      lines.push('## Knowledge Gaps\n');
+      report.gaps.forEach(g => lines.push(`- ${g}`));
+      lines.push('');
+    }
+
+    // Sources
+    if (report.sources?.length) {
+      lines.push('## Sources\n');
+      report.sources.forEach(s => {
+        lines.push(`### ${s.title}`);
+        lines.push(`*${s.relevance}*`);
+        lines.push(`> ${s.excerpt}`);
+        lines.push('');
+      });
+    }
+
+    // Timestamp
+    if (report.generated_at) {
+      const d = new Date(report.generated_at);
+      lines.push(`---\n*Generated: ${d.toLocaleString()}*`);
+    }
+
+    return lines.join('\n');
   }
 
   // ── Initialization ────────────────────────────────────────────────

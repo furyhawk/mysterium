@@ -28,9 +28,13 @@ up:
 ## Build (if needed) and start all services
 up-build: build up
 
-## Start a specific service (e.g. `make start service=mysterium`)
+## Start a specific service (e.g. `make start service=rag-server`)
 start:
 	$(COMPOSE) up -d $(SERVICE)
+
+## Start only the mysterium service (no dependencies)
+start-mysterium:
+	$(COMPOSE) up -d mysterium
 
 ## View logs from a service (e.g. `make logs`, `make logs service=rag-server`)
 logs:

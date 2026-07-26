@@ -85,7 +85,7 @@ class RAGClient:
 
     async def list_collections(self) -> list[CollectionItem]:
         """List all available collections."""
-        resp = await self._client.get("/api/v1/collections")
+        resp = await self._client.get("/api/collections")
         resp.raise_for_status()
         data = resp.json()
         return [
@@ -100,21 +100,21 @@ class RAGClient:
 
     async def create_collection(self, name: str) -> str:
         """Create a new collection."""
-        resp = await self._client.post(f"/api/v1/collections?name={name}")
+        resp = await self._client.post(f"/api/collections?name={name}")
         resp.raise_for_status()
         data = resp.json()
         return data.get("message", "")
 
     async def delete_collection(self, name: str) -> str:
         """Delete a collection and all its vectors."""
-        resp = await self._client.delete(f"/api/v1/collections/{name}")
+        resp = await self._client.delete(f"/api/collections/{name}")
         resp.raise_for_status()
         data = resp.json()
         return data.get("message", "")
 
     async def get_collection(self, name: str) -> CollectionItem:
         """Get collection stats."""
-        resp = await self._client.get(f"/api/v1/collections/{name}")
+        resp = await self._client.get(f"/api/collections/{name}")
         resp.raise_for_status()
         data = resp.json()
         return CollectionItem(
@@ -154,7 +154,7 @@ class RAGClient:
             files = {"file": (p.name, p.read_bytes())}
 
         resp = await self._client.post(
-            "/api/v1/documents/upload",
+            "/api/documents/upload",
             params={"collection_name": collection_name},
             files=files,
         )
@@ -175,7 +175,7 @@ class RAGClient:
         if status:
             params["status"] = status
 
-        resp = await self._client.get("/api/v1/documents", params=params)
+        resp = await self._client.get("/api/documents", params=params)
         resp.raise_for_status()
         data = resp.json()
         items = [
@@ -198,7 +198,7 @@ class RAGClient:
 
     async def get_document(self, doc_id: str) -> dict[str, Any] | None:
         """Get document details by ID."""
-        resp = await self._client.get(f"/api/v1/documents/{doc_id}")
+        resp = await self._client.get(f"/api/documents/{doc_id}")
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -206,7 +206,7 @@ class RAGClient:
 
     async def delete_document(self, doc_id: str) -> bool:
         """Delete a document. Returns True if deleted."""
-        resp = await self._client.delete(f"/api/v1/documents/{doc_id}")
+        resp = await self._client.delete(f"/api/documents/{doc_id}")
         if resp.status_code == 404:
             return False
         resp.raise_for_status()
@@ -241,7 +241,7 @@ class RAGClient:
             "min_score": min_score,
             "use_reranker": use_reranker,
         }
-        resp = await self._client.post("/api/v1/search", json=payload)
+        resp = await self._client.post("/api/search", json=payload)
         resp.raise_for_status()
         data = resp.json()
         return [
@@ -269,7 +269,7 @@ class RAGClient:
             "limit": limit,
             "min_score": min_score,
         }
-        resp = await self._client.post("/api/v1/search/multi", json=payload)
+        resp = await self._client.post("/api/search/multi", json=payload)
         resp.raise_for_status()
         data = resp.json()
         return [

@@ -37,9 +37,6 @@ services:
       HOST: "0.0.0.0"
       PORT: "8200"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
-    depends_on:
-      rag-server:
-        condition: service_healthy
     networks:
       - mysterium-net
 

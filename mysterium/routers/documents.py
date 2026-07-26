@@ -6,6 +6,7 @@ responses with additional status information.
 
 from __future__ import annotations
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
@@ -40,19 +41,24 @@ async def list_collections(
     rag: RAGClient = Depends(get_rag_client),
 ):
     """List all collections in the RAG system."""
-    collections = await rag.list_collections()
-    return {
-        "items": [
-            {
-                "name": c.name,
-                "total_vectors": c.total_vectors,
-                "dim": c.dim,
-                "indexing_status": c.indexing_status,
-            }
-            for c in collections
-        ],
-        "total": len(collections),
-    }
+    try:
+        collections = await rag.list_collections()
+        return {
+            "items": [
+                {
+                    "name": c.name,
+                    "total_vectors": c.total_vectors,
+                    "dim": c.dim,
+                    "indexing_status": c.indexing_status,
+                }
+                for c in collections
+            ],
+            "total": len(collections),
+        }
+    except httpx.ConnectError:
+        return {"items": [], "total": 0}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"RAG server unreachable: {e}")
 
 
 @router.post("/collections")
@@ -118,12 +124,17 @@ async def list_documents(
     rag: RAGClient = Depends(get_rag_client),
 ):
     """List tracked documents."""
-    items, total = await rag.list_documents(
-        collection_name=collection_name,
-        status=status,
-        page=page,
-        per_page=per_page,
-    )
+    try:
+        items, total = await rag.list_documents(
+            collection_name=collection_name,
+            status=status,
+            page=page,
+            per_page=per_page,
+        )
+    except httpx.ConnectError:
+        return {"items": [], "total": 0, "page": page, "per_page": per_page}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"RAG server unreachable: {e}")
     return {
         "items": [
             {

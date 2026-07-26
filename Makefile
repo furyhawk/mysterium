@@ -13,9 +13,13 @@ SERVICE    ?= mysterium
 build:
 	$(COMPOSE) build
 
-## Build the mysterium image as furyhawk/mysterium (standalone)
+## Build the mysterium image with auto tags (furyhawk/mysterium:latest + furyhawk/mysterium:<version>)
 docker-build:
-	$(DOCKER) build -t furyhawk/mysterium .
+	version=$$(git describe --tags --always 2>/dev/null || grep '^version' pyproject.toml | head -1 | sed "s/.*= *\"\(.*\)\"/\1/"); \
+	$(DOCKER) build \
+		-t furyhawk/mysterium:latest \
+		-t furyhawk/mysterium:$$version \
+		.
 
 ## Push furyhawk/mysterium to Docker Hub (run `docker login` first)
 docker-push:

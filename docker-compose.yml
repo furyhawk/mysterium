@@ -135,7 +135,7 @@ services:
 
   # ── Milvus (vector database) ───────────────────────────────────────
   milvus:
-    image: milvusdb/milvus:v2.5.9
+    image: milvusdb/milvus:v2.6.21
     container_name: mysterium-milvus
     restart: unless-stopped
     ports:

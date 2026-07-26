@@ -13,6 +13,14 @@ SERVICE    ?= mysterium
 build:
 	$(COMPOSE) build
 
+## Build the mysterium image as furyhawk/mysterium (standalone)
+docker-build:
+	$(DOCKER) build -t furyhawk/mysterium .
+
+## Push furyhawk/mysterium to Docker Hub (run `docker login` first)
+docker-push:
+	$(DOCKER) push furyhawk/mysterium
+
 ## Build and start all services in detached mode
 up:
 	$(COMPOSE) up -d

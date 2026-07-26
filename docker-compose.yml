@@ -25,9 +25,7 @@
 services:
   # ── Mysterium App ──────────────────────────────────────────────────
   mysterium:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: furyhawk/mysterium
     container_name: mysterium
     restart: unless-stopped
     ports:

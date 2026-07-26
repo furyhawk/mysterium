@@ -1,0 +1,33 @@
+# ── Version control ─────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Python / Virtual environment ────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Environment ─────────────────────────────────────────────────────
+.env
+.env.local
+
+# ── IDE / Editors ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Containers (don't re-copy build outputs) ───────────────────────
+Dockerfile
+docker-compose.yml
+.dockerignore
+Makefile
+README.md

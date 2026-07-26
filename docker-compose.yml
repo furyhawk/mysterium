@@ -1,0 +1,169 @@
+# Mysterium — containerised stack
+#
+# ┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌──────────┐
+# │   Browser   │────▶│  Mysterium   │────▶│ verity-rag  │────▶│  Milvus  │
+# │             │     │  (FastAPI)   │     │ (RAG server)│     │(vectors) │
+# │             │     │   :8200      │     │   :8100     │     │ :19530   │
+# │             │◀────│              │◀────│             │     └──────────┘
+# └─────────────┘     │   +─────────┤     │             │     ┌──────────┐
+#                     │   │pydantic-│     │             │────▶│PostgreSQL│
+#                     │   │deep     │     │             │     │  :5432   │
+#                     │   │(research│     │             │     └──────────┘
+#                     │   └─────────┘     │             │     ┌──────────┐
+#                     └──────────────┘     │             │────▶│ Valkey   │
+#                                          └─────────────┘     │  :6379   │
+#                                                              └──────────┘
+#
+# Usage:
+#   docker compose up -d                     # Start all services
+#   docker compose logs -f mysterium         # Follow app logs
+#   docker compose down -v                   # Stop & remove volumes
+#
+# Required: set ANTHROPIC_API_KEY in .env (see .env.example)
+# ────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Mysterium App ──────────────────────────────────────────────────
+  mysterium:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mysterium
+    restart: unless-stopped
+    ports:
+      - "${MYSTERIUM_PORT:-8200}:8200"
+    environment:
+      RAG_SERVER_URL: "http://rag-server:8100"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+      HOST: "0.0.0.0"
+      PORT: "8200"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    depends_on:
+      rag-server:
+        condition: service_healthy
+    networks:
+      - mysterium-net
+
+  # ── verity-rag RAG Server ──────────────────────────────────────────
+  rag-server:
+    image: python:3.13-slim
+    container_name: mysterium-rag
+    restart: unless-stopped
+    ports:
+      - "${RAG_PORT:-8100}:8100"
+    environment:
+      RAG_SERVER_URL: ""
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag}@postgres:5432/${POSTGRES_DB:-rag}"
+      VALKEY_URL: "redis://valkey:6379/0"
+      MILVUS_URI: "http://milvus:19530"
+      HOST: "0.0.0.0"
+      PORT: "8100"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      MEDIA_DIR: "/data/media"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-all-MiniLM-L6-v2}"
+      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY:-}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-}"
+      CROSS_ENCODER_MODEL: "${CROSS_ENCODER_MODEL:-cross-encoder/ms-marco-MiniLM-L6-v2}"
+      HF_TOKEN: "${HF_TOKEN:-}"
+    command: >
+      sh -c "
+        pip install --no-cache-dir verity-rag uvicorn &&
+        mkdir -p /data/media &&
+        exec uvicorn rag_agent.app:create_app --host 0.0.0.0 --port 8100 --factory
+      "
+    healthcheck:
+      test: ["CMD", "python", "-c", "import http.client; c = http.client.HTTPConnection('localhost', 8100); c.request('GET', '/health'); assert c.getresponse().status == 200"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    volumes:
+      - rag-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    networks:
+      - mysterium-net
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mysterium-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-rag}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-rag}"
+      POSTGRES_DB: "${POSTGRES_DB:-rag}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag} -d ${POSTGRES_DB:-rag}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - mysterium-net
+
+  # ── Valkey / Redis ─────────────────────────────────────────────────
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: mysterium-valkey
+    restart: unless-stopped
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
+    networks:
+      - mysterium-net
+
+  # ── Milvus (vector database) ───────────────────────────────────────
+  milvus:
+    image: milvusdb/milvus:v2.5.9
+    container_name: mysterium-milvus
+    restart: unless-stopped
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+    environment:
+      ETCD_USE_EMBED: "true"
+      MINIO_USE_EMBED: "true"
+      COMMON_STORAGETYPE: "local"
+      MILVUS_CONF__proxy__port: "19530"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 10s
+      start_period: 120s
+      retries: 10
+    networks:
+      - mysterium-net
+
+# ── Volumes ──────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+  valkey-data:
+  milvus-data:
+  rag-data:
+
+# ── Networks ─────────────────────────────────────────────────────────
+networks:
+  mysterium-net:
+    name: mysterium-net

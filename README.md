@@ -6,6 +6,50 @@
 
 ## Quick Start
 
+### Option A — Containerised (Docker / Podman Compose) 🐳
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/engine/install/) or [Podman](https://podman.io/) with Compose plugin
+- An [Anthropic API key](https://console.anthropic.com/) (for the research agent)
+
+### Setup
+
+```bash
+cd mysterium
+
+# Create environment config
+cp .env.example .env
+# Edit .env — set ANTHROPIC_API_KEY
+# (RAG_SERVER_URL is automatically set in the compose network)
+
+# Build and start all services
+make up-build
+
+# Or if using Podman:
+# make up-build DOCKER=podman
+```
+
+Open **http://localhost:8200** in your browser.
+
+> The compose stack starts **Mysterium** (FastAPI, :8200), **verity-rag** (RAG server, :8100), **PostgreSQL**, **Valkey** (Redis-compatible), and **Milvus** (vector database). All external services are pre-configured to talk to each other.
+
+### Useful Makefile commands
+
+```bash
+make build          # Build container images
+make up             # Start all services in detached mode
+make logs           # Follow Mysterium logs
+make logs service=rag-server   # Follow RAG server logs
+make down           # Stop & remove containers (keeps volumes)
+make destroy        # Stop & remove everything INCLUDING data volumes
+make shell          # Open a shell in the mysterium container
+make health         # Check health of both services
+make help           # Show all targets
+```
+
+### Option B — Local (uv)
+
 ### Prerequisites
 
 - Python 3.13+
@@ -16,7 +60,6 @@
 ### Setup
 
 ```bash
-# Clone and enter the project
 cd mysterium
 
 # Install dependencies

@@ -107,7 +107,11 @@ uv-sync:
 
 ## Run the app locally with uvicorn (requires .env)
 dev:
-	uv run uvicorn mysterium.main:app --reload --port 8200
+	uv run uvicorn mysterium.main:app --reload --port 8200 --host 0.0.0.0
+
+## Run the app as a background service (logs to mysterium.log)
+service:
+	nohup uv run uvicorn mysterium.main:app --reload --port 8200 --host 0.0.0.0 > mysterium.log 2>&1 &
 
 # ── Help ────────────────────────────────────────────────────────────
 
@@ -122,4 +126,4 @@ help:
 	@printf "  \033[33mSERVICE\033[0m  = $(SERVICE)       (target service name)\n"
 	@printf "  \033[33mCMD\033[0m      =                 (command for run target)\n\n"
 
-.PHONY: build up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev help
+.PHONY: build up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev service help

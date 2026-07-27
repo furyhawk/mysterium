@@ -31,7 +31,7 @@ services:
     ports:
       - "${MYSTERIUM_PORT:-8200}:8200"
     environment:
-      RAG_SERVER_URL: "http://rag-server:8100"
+      RAG_SERVER_URL: "${RAG_SERVER_URL:-http://rag-server:8100}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
       HOST: "0.0.0.0"

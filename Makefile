@@ -5,6 +5,7 @@
 DOCKER     ?= docker
 COMPOSE    ?= $(DOCKER) compose
 PYTHON     ?= python3
+REGISTRY   ?= docker.io
 IMAGE      ?= furyhawk/mysterium
 VERSION    ?= $(shell $(PYTHON) -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
 
@@ -16,26 +17,30 @@ SERVICE    ?= mysterium
 build:
 	$(COMPOSE) build
 
-## Build the mysterium image for the current host architecture with auto tags ($(IMAGE):latest + $(IMAGE):$(VERSION))
+## Build the mysterium image for the current host architecture with auto tags ($(REGISTRY)/$(IMAGE):latest + $(REGISTRY)/$(IMAGE):$(VERSION))
 docker-build:
 	$(DOCKER) build \
-		-t $(IMAGE):latest \
-		-t $(IMAGE):$(VERSION) \
+		-t $(REGISTRY)/$(IMAGE):latest \
+		-t $(REGISTRY)/$(IMAGE):$(VERSION) \
 		.
 
-## Push the latest and version-tagged images to Docker Hub (run `docker login` first)
-docker-push:
-	$(DOCKER) push $(IMAGE):$(VERSION)
-	$(DOCKER) push $(IMAGE):latest
+## Log in to the container registry (run this before docker-push or docker-publish)
+docker-login:
+	$(DOCKER) login $(REGISTRY)
 
-## Build and publish the current version image for linux/amd64 and linux/arm64
+## Push the latest and version-tagged images to the registry (run `make docker-login` first)
+docker-push:
+	$(DOCKER) push $(REGISTRY)/$(IMAGE):$(VERSION)
+	$(DOCKER) push $(REGISTRY)/$(IMAGE):latest
+
+## Build and publish the current version image for linux/amd64 and linux/arm64 (run `make docker-login` first)
 PLATFORMS ?= linux/amd64,linux/arm64
 docker-publish:
 	$(DOCKER) buildx build \
 		--platform $(PLATFORMS) \
 		--push \
-		-t $(IMAGE):latest \
-		-t $(IMAGE):$(VERSION) \
+		-t $(REGISTRY)/$(IMAGE):latest \
+		-t $(REGISTRY)/$(IMAGE):$(VERSION) \
 		.
 
 ## Build and start all services in detached mode
@@ -139,8 +144,9 @@ help:
 	@grep -Eh '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@printf "\n\033[1mVariables:\033[0m\n"
-	@printf "  \033[33mDOCKER\033[0m   = $(DOCKER)        (change to podman)\n"
-	@printf "  \033[33mSERVICE\033[0m  = $(SERVICE)       (target service name)\n"
-	@printf "  \033[33mCMD\033[0m      =                 (command for run target)\n\n"
+	@printf "  \033[33mDOCKER\033[0m    = $(DOCKER)        (change to podman)\n"
+	@printf "  \033[33mREGISTRY\033[0m  = $(REGISTRY)  (target container registry)\n"
+	@printf "  \033[33mSERVICE\033[0m   = $(SERVICE)       (target service name)\n"
+	@printf "  \033[33mCMD\033[0m       =                 (command for run target)\n\n"
 
-.PHONY: build docker-build docker-push docker-publish up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev service kill-service help
+.PHONY: build docker-build docker-login docker-push docker-publish up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev service kill-service help

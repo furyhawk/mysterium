@@ -6,13 +6,7 @@ DOCKER     ?= docker
 COMPOSE    ?= $(DOCKER) compose
 PYTHON     ?= python3
 IMAGE      ?= furyhawk/mysterium
-VERSION    ?= $(shell $(PYTHON) - <<'PY'
-import pathlib, re
-text = pathlib.Path('pyproject.toml').read_text()
-match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
-print(match.group(1) if match else 'dev')
-PY
-)
+VERSION    ?= $(shell $(PYTHON) -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
 
 SERVICE    ?= mysterium
 
@@ -22,7 +16,7 @@ SERVICE    ?= mysterium
 build:
 	$(COMPOSE) build
 
-## Build the mysterium image with auto tags ($(IMAGE):latest + $(IMAGE):$(VERSION))
+## Build the mysterium image for the current host architecture with auto tags ($(IMAGE):latest + $(IMAGE):$(VERSION))
 docker-build:
 	$(DOCKER) build \
 		-t $(IMAGE):latest \
@@ -34,8 +28,15 @@ docker-push:
 	$(DOCKER) push $(IMAGE):$(VERSION)
 	$(DOCKER) push $(IMAGE):latest
 
-## Build and publish the current version image
-docker-publish: docker-build docker-push
+## Build and publish the current version image for linux/amd64 and linux/arm64
+PLATFORMS ?= linux/amd64,linux/arm64
+docker-publish:
+	$(DOCKER) buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-t $(IMAGE):latest \
+		-t $(IMAGE):$(VERSION) \
+		.
 
 ## Build and start all services in detached mode
 up:

@@ -446,11 +446,24 @@
   }
 
   // ── Initialization ────────────────────────────────────────────────
+  async function loadVersion() {
+    try {
+      const data = await API.get('/api/version');
+      const version = data?.version;
+      if (version && els.appVersion) {
+        els.appVersion.textContent = `v${version}`;
+      }
+    } catch (e) {
+      console.warn('Failed to load version:', e);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     // DOM refs
     els = {
       toast: document.getElementById('toast'),
       navStatus: document.getElementById('navStatus'),
+      appVersion: document.getElementById('appVersion'),
       uploadZone: document.getElementById('uploadZone'),
       fileInput: document.getElementById('fileInput'),
       uploadCollection: document.getElementById('uploadCollection'),
@@ -531,6 +544,7 @@
     els.docFilterCollection?.addEventListener('change', loadDocuments);
 
     // Load initial data
+    loadVersion();
     loadCollections();
     loadDocuments();
   });

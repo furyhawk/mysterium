@@ -15,13 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from mysterium import __version__
 from mysterium.config import Settings
 
 app = FastAPI(
     title="Mysterium",
     description="RAG-powered research platform — upload documents, "
     "search with verity-rag, and synthesise reports with pydantic-deep agents",
-    version="0.1.0",
+    version=__version__,
 )
 
 # ── CORS ────────────────────────────────────────────────────────────
@@ -35,6 +36,13 @@ app.add_middleware(
 )
 
 # ── Routes ──────────────────────────────────────────────────────────
+
+
+@app.get("/api/version", include_in_schema=False)
+async def get_version() -> dict[str, str]:
+    """Return the current package version for the frontend and tooling."""
+    return {"version": __version__}
+
 
 from mysterium.routers import documents, research  # noqa: E402
 

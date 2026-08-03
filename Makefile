@@ -4,6 +4,15 @@
 
 DOCKER     ?= docker
 COMPOSE    ?= $(DOCKER) compose
+PYTHON     ?= python3
+IMAGE      ?= furyhawk/mysterium
+VERSION    ?= $(shell $(PYTHON) - <<'PY'
+import pathlib, re
+text = pathlib.Path('pyproject.toml').read_text()
+match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+print(match.group(1) if match else 'dev')
+PY
+)
 
 SERVICE    ?= mysterium
 
@@ -13,17 +22,20 @@ SERVICE    ?= mysterium
 build:
 	$(COMPOSE) build
 
-## Build the mysterium image with auto tags (furyhawk/mysterium:latest + furyhawk/mysterium:<version>)
+## Build the mysterium image with auto tags ($(IMAGE):latest + $(IMAGE):$(VERSION))
 docker-build:
-	version=$$(git describe --tags --always 2>/dev/null || grep '^version' pyproject.toml | head -1 | sed "s/.*= *\"\(.*\)\"/\1/"); \
 	$(DOCKER) build \
-		-t furyhawk/mysterium:latest \
-		-t furyhawk/mysterium:$$version \
+		-t $(IMAGE):latest \
+		-t $(IMAGE):$(VERSION) \
 		.
 
-## Push furyhawk/mysterium to Docker Hub (run `docker login` first)
+## Push the latest and version-tagged images to Docker Hub (run `docker login` first)
 docker-push:
-	$(DOCKER) push furyhawk/mysterium
+	$(DOCKER) push $(IMAGE):$(VERSION)
+	$(DOCKER) push $(IMAGE):latest
+
+## Build and publish the current version image
+docker-publish: docker-build docker-push
 
 ## Build and start all services in detached mode
 up:
@@ -130,4 +142,4 @@ help:
 	@printf "  \033[33mSERVICE\033[0m  = $(SERVICE)       (target service name)\n"
 	@printf "  \033[33mCMD\033[0m      =                 (command for run target)\n\n"
 
-.PHONY: build up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev service kill-service help
+.PHONY: build docker-build docker-push docker-publish up up-build start logs ps stop down destroy pull restart run shell migrate migrate-history health uv-sync dev service kill-service help

@@ -135,6 +135,15 @@ a:hover { text-decoration: underline; }
   gap: 6px;
 }
 
+.nav-version {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--bg-tertiary);
+}
+
 /* ── Main Content ─────────────────────────────────────────────────── */
 .main-content {
   max-width: 960px;

@@ -2,11 +2,11 @@
 # Podman users: prefix commands with DOCKER=podman (e.g. `make build DOCKER=podman`)
 # ────────────────────────────────────────────────────────────────────────────
 
-DOCKER     ?= docker
+DOCKER     ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; else echo docker; fi)
 COMPOSE    ?= $(DOCKER) compose
 PYTHON     ?= python3
 IMAGE      ?= furyhawk/mysterium
-VERSION    ?= $(shell $(PYTHON) -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+VERSION    ?= $(shell awk -F'"' '/^version = /{print $$2; exit}' pyproject.toml 2>/dev/null || echo dev)
 
 SERVICE    ?= mysterium
 
@@ -28,15 +28,24 @@ docker-push:
 	$(DOCKER) push $(IMAGE):$(VERSION)
 	$(DOCKER) push $(IMAGE):latest
 
-## Build and publish the current version image for linux/amd64 and linux/arm64
+## Build and publish the current version image with the selected container engine
 PLATFORMS ?= linux/amd64,linux/arm64
 docker-publish:
-	$(DOCKER) buildx build \
-		--platform $(PLATFORMS) \
-		--push \
-		-t $(IMAGE):latest \
-		-t $(IMAGE):$(VERSION) \
-		.
+	@command -v $(DOCKER) >/dev/null 2>&1 || { echo "$(DOCKER) is not installed or not on PATH"; exit 1; }
+	@if [ "$(DOCKER)" = "podman" ]; then \
+		$(DOCKER) build -t $(IMAGE):$(VERSION) .; \
+		$(DOCKER) tag $(IMAGE):$(VERSION) $(IMAGE):latest; \
+		$(DOCKER) push $(IMAGE):$(VERSION); \
+		$(DOCKER) push $(IMAGE):latest; \
+	else \
+		command -v docker-buildx >/dev/null 2>&1 || { echo "docker buildx is not available; install Docker Buildx or use DOCKER=podman"; exit 1; }; \
+		$(DOCKER) buildx build \
+			--platform $(PLATFORMS) \
+			--push \
+			-t $(IMAGE):latest \
+			-t $(IMAGE):$(VERSION) \
+			.; \
+	fi
 
 ## Build and start all services in detached mode
 up:

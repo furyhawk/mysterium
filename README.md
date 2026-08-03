@@ -45,7 +45,7 @@ make down           # Stop & remove containers (keeps volumes)
 make destroy        # Stop & remove everything INCLUDING data volumes
 make shell          # Open a shell in the mysterium container
 make health         # Check health of both services
-make docker-publish # Build and push multi-arch images for linux/amd64 and linux/arm64
+make docker-publish # Build and push the image with the selected container engine (Docker Buildx or Podman)
 make help           # Show all targets
 ```
 

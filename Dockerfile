@@ -1,11 +1,12 @@
 # ── Build stage ─────────────────────────────────────────────────────
 FROM python:3.13-slim AS builder
 
-RUN pip install --no-cache-dir uv
-
 WORKDIR /app
+RUN python -m venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+
 COPY pyproject.toml ./
-RUN uv sync --no-dev
+RUN python -c "import subprocess, tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; subprocess.check_call(['pip', 'install', '--no-cache-dir', *deps])"
 
 # ── Runtime stage ──────────────────────────────────────────────────
 FROM python:3.13-slim

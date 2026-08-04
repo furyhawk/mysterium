@@ -35,6 +35,17 @@ docker-push:
 
 ## Build and publish the current version image for linux/amd64 and linux/arm64 (run `make docker-login` first)
 PLATFORMS ?= linux/amd64,linux/arm64
+# Podman uses `build --manifest` + `manifest push`; Docker uses `buildx build --push`
+ifeq ($(DOCKER),podman)
+docker-publish:
+	$(DOCKER) build \
+		--platform $(PLATFORMS) \
+		--manifest $(REGISTRY)/$(IMAGE):$(VERSION) \
+		.
+	$(DOCKER) manifest push --all $(REGISTRY)/$(IMAGE):$(VERSION)
+	$(DOCKER) manifest push --all $(REGISTRY)/$(IMAGE):$(VERSION) \
+		$(REGISTRY)/$(IMAGE):latest
+else
 docker-publish:
 	$(DOCKER) buildx build \
 		--platform $(PLATFORMS) \
@@ -42,6 +53,7 @@ docker-publish:
 		-t $(REGISTRY)/$(IMAGE):latest \
 		-t $(REGISTRY)/$(IMAGE):$(VERSION) \
 		.
+endif
 
 ## Build and start all services in detached mode
 up:

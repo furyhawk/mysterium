@@ -6,13 +6,16 @@ optionally augmenting with web search results.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
 from anthropic import AsyncAnthropic
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from mysterium.clients.rag_client import RAGClient
+
+logger = logging.getLogger(__name__)
 
 
 # ── Structured Output Models ────────────────────────────────────────
@@ -128,6 +131,31 @@ class RAGResearchTool:
         return [c.name for c in collections]
 
 
+def _extract_tool_report(response: Any) -> dict[str, Any] | None:
+    """Extract and validate the submitted report from a tool-use response.
+
+    Some Anthropic-compatible gateways return a ``submit_report`` tool call with
+    an empty or malformed ``input``. This helper validates the tool input against
+    the :class:`ResearchReport` schema and returns a clean dict, or ``None`` when
+    the model did not produce a usable report (text response, or empty tool input).
+
+    Returns:
+        Validated report dict, or ``None`` if no valid tool call was made.
+    """
+    for block in response.content:
+        if block.type != "tool_use" or block.name != "submit_report":
+            continue
+        raw = block.input or {}
+        try:
+            return ResearchReport.model_validate(raw).model_dump()
+        except ValidationError:
+            logger.warning(
+                "submit_report tool input failed schema validation: %s", raw
+            )
+            return None
+    return None
+
+
 def _build_system_prompt(rag_context: str) -> str:
     """Build the system prompt for the research agent."""
     return f"""You are a research synthesis agent. Your job is to produce a thorough,
@@ -180,7 +208,6 @@ async def generate_research_report(
         base_url: Optional custom base URL for an Anthropic-compatible gateway.
         model: Claude model name.
         max_tokens: Maximum output tokens.
-        max_tokens: Maximum output tokens.
 
     Returns:
         Structured ResearchReport as a dict.
@@ -217,41 +244,71 @@ async def generate_research_report(
         base_url=base_url if base_url else None,
     )
 
-    response = await client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=[{"type": "text", "text": system_prompt}],
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"Research the following topic thoroughly:\n\n{query}\n\n"
-                    f"Produce a structured report using the available tools."
-                ),
-            }
-        ],
-        tools=[
-            {
-                "name": "submit_report",
-                "description": "Submit the final structured research report",
-                "input_schema": ResearchReport.model_json_schema(),
-            }
-        ],
-        # "any" forces tool use without naming a specific tool (required for
-        # models with extended thinking — "tool" + name is not supported)
-        tool_choice={"type": "any"},
-    )
+    user_message: dict[str, Any] = {
+        "role": "user",
+        "content": (
+            f"Research the following topic thoroughly:\n\n{query}\n\n"
+            f"Produce a structured report using the available tools."
+        ),
+    }
 
-    # 3. Parse the tool call output
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "submit_report":
-            report = block.input
-            report["generated_at"] = datetime.now().isoformat()
-            return report
+    tools = [
+        {
+            "name": "submit_report",
+            "description": "Submit the final structured research report",
+            "input_schema": ResearchReport.model_json_schema(),
+        }
+    ]
 
-    # Fallback: return raw text wrapped in structure
+    # 3. Call the model, retrying once if the forced tool call comes back empty.
+    # Some Anthropic-compatible gateways return an empty ``submit_report`` tool
+    # call when tool_choice is forced to "any", which would otherwise yield a
+    # useless `{"generated_at": ...}` payload and a "Failed to generate report"
+    # error in the UI. Retrying with "auto" lets the model fall back to writing
+    # the report as plain text when it can't (or won't) fill in the tool schema.
+    report_dict: dict[str, Any] | None = None
+    for attempt, tool_choice in enumerate(({"type": "any"}, {"type": "auto"})):
+        system_text = system_prompt
+        if attempt:
+            system_text += (
+                "\n\nIf you cannot use the submit_report tool, write the full "
+                "report as plain structured text (title, summary, key findings, "
+                "sections, sources, gaps) in your response instead."
+            )
+
+        response = await client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=[{"type": "text", "text": system_text}],
+            messages=[user_message],
+            tools=tools,
+            tool_choice=tool_choice,
+        )
+
+        report_dict = _extract_tool_report(response)
+        if report_dict is not None:
+            break
+        if attempt == 0:
+            logger.warning(
+                "Forced tool call returned no valid report for query=%r; "
+                "retrying with auto tool choice",
+                query,
+            )
+
+    if report_dict is not None:
+        report_dict["generated_at"] = datetime.now().isoformat()
+        return report_dict
+
+    # 4. Fallback: return raw text wrapped in structure
     text_blocks = [b.text for b in response.content if hasattr(b, "text")]
     raw = "\n".join(text_blocks) if text_blocks else str(response.content)
+
+    logger.warning(
+        "No valid submit_report tool call received for query=%r; "
+        "returning raw-text fallback (%d content blocks)",
+        query,
+        len(response.content),
+    )
 
     return ResearchReport(
         title=f"Research: {query}",

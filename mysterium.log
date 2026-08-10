@@ -1,0 +1,14 @@
+INFO:     Will watch for changes in these directories: ['/home/system/mysterium']
+INFO:     Uvicorn running on http://0.0.0.0:8200 (Press CTRL+C to quit)
+INFO:     Started reloader process [2053089] using WatchFiles
+INFO:     Started server process [2053107]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     192.168.50.85:54376 - "GET /ui/ HTTP/1.1" 304 Not Modified
+INFO:     192.168.50.85:54364 - "GET /api/documents?page=1&per_page=50 HTTP/1.1" 200 OK
+INFO:     192.168.50.85:54376 - "GET /api/documents/collections HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2053107]
+INFO:     Stopping reloader process [2053089]

@@ -70,6 +70,13 @@ async def create_research_report(
             base_url=settings.anthropic_base_url,
             model=body.model,
         )
+        # Defensive: the agent guarantees a title, but never serve a payload
+        # that the UI would treat as an empty response.
+        if not report or not report.get("title"):
+            raise HTTPException(
+                status_code=502,
+                detail="Model returned an empty report; please retry.",
+            )
         return report
     except Exception as e:
         raise HTTPException(

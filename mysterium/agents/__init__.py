@@ -6,7 +6,9 @@ optionally augmenting with web search results.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -50,7 +52,9 @@ class ResearchReport(BaseModel):
     gaps: list[str] = Field(
         description="Knowledge gaps or areas needing further research"
     )
-    generated_at: str = Field(description="ISO-8601 timestamp of generation")
+    generated_at: str = Field(
+        default="", description="ISO-8601 timestamp of generation"
+    )
 
 
 # ── Agent Implementation ────────────────────────────────────────────
@@ -156,6 +160,49 @@ def _extract_tool_report(response: Any) -> dict[str, Any] | None:
     return None
 
 
+def _extract_response_text(response: Any) -> str:
+    """Join the plain-text blocks of an Anthropic response.
+
+    Thinking and tool-use blocks are ignored so the result is safe to render
+    (no ``repr()`` dumps of internal SDK objects leak into reports).
+    """
+    return "\n".join(
+        b.text for b in response.content if getattr(b, "type", "") == "text"
+    )
+
+
+def _parse_json_report(text: str) -> dict[str, Any] | None:
+    """Extract and validate a JSON-serialised ResearchReport from model text.
+
+    Handles responses wrapped in markdown code fences or with incidental prose
+    around the JSON object. Returns ``None`` when no valid report could be
+    parsed.
+    """
+    if not text:
+        return None
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[A-Za-z0-9_-]*\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(cleaned[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
+        return ResearchReport.model_validate(data).model_dump()
+    except ValidationError:
+        logger.warning(
+            "JSON report text failed schema validation: %.200s...", cleaned
+        )
+        return None
+
+
 def _build_system_prompt(rag_context: str) -> str:
     """Build the system prompt for the research agent."""
     return f"""You are a research synthesis agent. Your job is to produce a thorough,
@@ -189,7 +236,7 @@ async def generate_research_report(
     api_key: str,
     base_url: str = "",
     model: str = "claude-sonnet-4-20250514",
-    max_tokens: int = 4096,
+    max_tokens: int = 16192,
 ) -> dict[str, Any]:
     """Generate a structured research report using Anthropic directly.
 
@@ -238,6 +285,7 @@ async def generate_research_report(
 
     # 2. Build the structured output schema for tool use
     system_prompt = _build_system_prompt(rag_context)
+    schema = ResearchReport.model_json_schema()
 
     client = AsyncAnthropic(
         api_key=api_key,
@@ -256,56 +304,84 @@ async def generate_research_report(
         {
             "name": "submit_report",
             "description": "Submit the final structured research report",
-            "input_schema": ResearchReport.model_json_schema(),
+            "input_schema": schema,
         }
     ]
 
-    # 3. Call the model, retrying once if the forced tool call comes back empty.
-    # Some Anthropic-compatible gateways return an empty ``submit_report`` tool
-    # call when tool_choice is forced to "any", which would otherwise yield a
-    # useless `{"generated_at": ...}` payload and a "Failed to generate report"
-    # error in the UI. Retrying with "auto" lets the model fall back to writing
-    # the report as plain text when it can't (or won't) fill in the tool schema.
-    report_dict: dict[str, Any] | None = None
-    for attempt, tool_choice in enumerate(({"type": "any"}, {"type": "auto"})):
-        system_text = system_prompt
-        if attempt:
-            system_text += (
-                "\n\nIf you cannot use the submit_report tool, write the full "
-                "report as plain structured text (title, summary, key findings, "
-                "sections, sources, gaps) in your response instead."
-            )
+    # 3. Try the structured tool call first (works against native Anthropic).
+    # Some Anthropic-compatible gateways return a ``submit_report`` tool call
+    # with empty input ({}), which would otherwise yield a useless
+    # `{"generated_at": ...}` payload, so the result is validated below and we
+    # fall back when it isn't usable.
+    response = await client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        system=[{"type": "text", "text": system_prompt}],
+        messages=[user_message],
+        tools=tools,
+        tool_choice={"type": "any"},
+    )
+    report_dict: dict[str, Any] | None = _extract_tool_report(response)
 
+    # 3b. If the gateway ignored tool_choice and the model wrote the report as
+    # JSON inside a text block, pick it up from this same response.
+    if report_dict is None:
+        report_dict = _parse_json_report(_extract_response_text(response))
+
+    # 4. Fallback: ask the model for a plain-JSON response and forbid tools.
+    # This is the reliable path for gateways that mangle tool arguments, and it
+    # also avoids leaking thinking/tool-use block reprs into the report.
+    if report_dict is None:
+        logger.warning(
+            "Structured tool call returned no valid report for query=%r; "
+            "requesting JSON-text output instead",
+            query,
+        )
         response = await client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=[{"type": "text", "text": system_text}],
-            messages=[user_message],
-            tools=tools,
-            tool_choice=tool_choice,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt
+                    + (
+                        "\n\nRespond with plain text only and do NOT call any "
+                        "tools. Your entire response must be a single valid "
+                        "JSON object conforming to the provided schema."
+                    ),
+                }
+            ],
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Research the following topic thoroughly:\n\n{query}\n\n"
+                        "Return ONLY a single JSON object matching exactly this "
+                        "schema (no markdown fences, no commentary before or "
+                        "after):\n\n"
+                        f"{json.dumps(schema, indent=2)}"
+                    ),
+                }
+            ],
         )
-
-        report_dict = _extract_tool_report(response)
-        if report_dict is not None:
-            break
-        if attempt == 0:
-            logger.warning(
-                "Forced tool call returned no valid report for query=%r; "
-                "retrying with auto tool choice",
-                query,
-            )
+        report_dict = _parse_json_report(_extract_response_text(response))
 
     if report_dict is not None:
         report_dict["generated_at"] = datetime.now().isoformat()
         return report_dict
 
-    # 4. Fallback: return raw text wrapped in structure
-    text_blocks = [b.text for b in response.content if hasattr(b, "text")]
-    raw = "\n".join(text_blocks) if text_blocks else str(response.content)
+    # 5. Last resort: wrap whatever plain text the model produced (thinking and
+    #    tool-use blocks are excluded so we never render raw SDK object reprs).
+    raw = _extract_response_text(response).strip()
+    if not raw:
+        raw = (
+            "The model returned no usable text content for this query. "
+            "Please try again."
+        )
 
     logger.warning(
-        "No valid submit_report tool call received for query=%r; "
-        "returning raw-text fallback (%d content blocks)",
+        "No valid report received for query=%r; returning raw-text wrap "
+        "(%d content blocks)",
         query,
         len(response.content),
     )

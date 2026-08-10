@@ -179,9 +179,9 @@ The client uses verity-rag's own `schemas` models for type-safe request/response
 
 ### pydantic-deep (pydantic_deep)
 The research agent in `mysterium/agents/__init__.py` uses pydantic-deep's agent framework:
-- **`create_deep_agent`** — drives report generation, wired with custom RAG tools and web search capability
+- **`create_deep_agent`** — drives report generation, wired with custom RAG tools and [web search](https://pydantic.dev/docs/ai/capabilities/web-search/) capability
 - **Custom RAG tools** — `rag_search` / `list_collections` are async functions that query verity-rag via `ctx.deps` (a `DeepAgentDeps` subclass carrying the `RAGClient`)
-- **Web tools** — `web_search` + `web_fetch` are enabled by default so the agent extends private documents with live public sources
+- **Web tools** — [WebSearch](https://pydantic.dev/docs/ai/capabilities/web-search/) + [WebFetch](https://pydantic.dev/docs/ai/capabilities/web-fetch/) are enabled by default so the agent extends private documents with live public sources
 - **Structured output** — the `ResearchReport` Pydantic model is set as `output_type`, so the model must produce a validated report (no manual JSON parsing)
 - **Headless mode** — filesystem, shell, sub-agents and persistent memory are disabled for the single-shot API task; the model's HTTP client is closed after each run via `async with agent`
 

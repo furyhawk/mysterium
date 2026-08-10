@@ -69,6 +69,7 @@ async def create_research_report(
             api_key=settings.anthropic_api_key,
             base_url=settings.anthropic_base_url,
             model=body.model,
+            max_tokens=settings.anthropic_max_tokens,
         )
         # Defensive: the agent guarantees a title, but never serve a payload
         # that the UI would treat as an empty response.

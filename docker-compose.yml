@@ -34,6 +34,7 @@ services:
       RAG_SERVER_URL: "${RAG_SERVER_URL:-http://rag-server:8100}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+      ANTHROPIC_MAX_TOKENS: "${ANTHROPIC_MAX_TOKENS:-32768}"
       HOST: "0.0.0.0"
       PORT: "8200"
       LOG_LEVEL: "${LOG_LEVEL:-info}"

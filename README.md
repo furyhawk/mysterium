@@ -147,6 +147,8 @@ All settings via environment variables (see `.env.example`):
 |----------|---------|-------------|
 | `RAG_SERVER_URL` | `http://localhost:8100` | verity-rag server address |
 | `ANTHROPIC_API_KEY` | — | API key for research agent |
+| `ANTHROPIC_BASE_URL` | — | Optional custom base URL for an Anthropic-compatible gateway |
+| `ANTHROPIC_MAX_TOKENS` | `32768` | Max output tokens for research report generation |
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8200` | Server port |
 | `LOG_LEVEL` | `info` | Logging level |

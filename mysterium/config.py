@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     # Optional: custom base URL for Anthropic-compatible gateway
     anthropic_base_url: str = ""
+    # Maximum output tokens for research report generation
+    anthropic_max_tokens: int = 32768
 
     # FastAPI server config
     host: str = "0.0.0.0"

@@ -236,7 +236,7 @@ async def generate_research_report(
     api_key: str,
     base_url: str = "",
     model: str = "claude-sonnet-4-20250514",
-    max_tokens: int = 16192,
+    max_tokens: int = 32768,
 ) -> dict[str, Any]:
     """Generate a structured research report using Anthropic directly.
 

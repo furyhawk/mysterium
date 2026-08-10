@@ -8,7 +8,10 @@ dependencies = [
     "anthropic>=0.117.0",
     "fastapi==0.115.6",
     "httpx>=0.28.1",
-    "pydantic-ai-slim>=2.14.1",
+    # >=2.18.0 required for the local WebFetch(native=False, local=True)
+    # capability (markdownify-based local web-fetch tool).
+    "markdownify>=1.2",
+    "pydantic-ai-slim>=2.18.0",
     "pydantic-deep>=0.3.20",
     "pydantic-settings>=2.14.2",
     "uvicorn>=0.51.0",

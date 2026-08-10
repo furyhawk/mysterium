@@ -27,12 +27,18 @@ class Settings(BaseSettings):
     # Augment RAG research with web search (default: on)
     research_use_web: bool = True
 
-    # Enable web page fetch (Anthropic's server-side `web_fetch` tool).
-    # None (default) = auto: enabled with the official Anthropic API, but
-    # disabled when a custom ANTHROPIC_BASE_URL gateway is used — most
-    # Anthropic-compatible gateways (e.g. DeepSeek) reject the server-side
-    # `web_fetch_20250910` tool with HTTP 400.
+    # Enable web page fetch. None (default) = auto: enabled with the official
+    # Anthropic API, but disabled when a custom ANTHROPIC_BASE_URL gateway is
+    # used AND the local fetch tool is off — most Anthropic-compatible
+    # gateways (e.g. DeepSeek) reject the server-side `web_fetch_20250910`
+    # tool with HTTP 400.
     research_web_fetch: bool | None = None
+
+    # Fetch web pages with a LOCAL markdownify-based tool (pydantic-ai's
+    # `WebFetch(native=False, local=True)`) instead of Anthropic's server-side
+    # `web_fetch` tool. Local fetching runs in this process and works with
+    # every Anthropic-compatible gateway, so it defaults to True.
+    research_web_fetch_local: bool = True
 
     # FastAPI server config
     host: str = "0.0.0.0"

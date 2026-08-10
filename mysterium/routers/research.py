@@ -42,6 +42,15 @@ class ReportRequest(BaseModel):
             "Defaults to the server RESEARCH_WEB_FETCH setting."
         ),
     )
+    use_web_fetch_local: bool | None = Field(
+        default=None,
+        description=(
+            "Fetch pages with a local markdownify-based tool instead of "
+            "Anthropic's server-side web-fetch tool. Works with every "
+            "Anthropic-compatible gateway. Defaults to the server "
+            "RESEARCH_WEB_FETCH_LOCAL setting."
+        ),
+    )
 
 
 class AskRequest(BaseModel):
@@ -76,17 +85,25 @@ async def create_research_report(
 
     try:
         use_web = settings.research_use_web if body.use_web is None else body.use_web
+        # web_fetch_local: request > RESEARCH_WEB_FETCH_LOCAL setting > True.
+        if body.use_web_fetch_local is not None:
+            web_fetch_local = body.use_web_fetch_local
+        else:
+            web_fetch_local = settings.research_web_fetch_local
+
         # The server-side web-fetch tool is rejected by most Anthropic-
         # compatible gateways (it is not part of the standard tool set they
         # deserialise). Explicitly configured RESEARCH_WEB_FETCH wins; otherwise
-        # default to enabled only for the official Anthropic API (no custom
-        # base URL), and off for custom gateways.
+        # auto: fetch stays on for the official Anthropic API (no custom base
+        # URL), AND for custom gateways whenever the local fetch tool is in use
+        # — the local markdownify tool works with every gateway. Fetch is only
+        # auto-disabled for gateways when falling back to the server-side tool.
         if body.use_web_fetch is not None:
             web_fetch = body.use_web_fetch
         elif settings.research_web_fetch is not None:
             web_fetch = settings.research_web_fetch
         else:
-            web_fetch = not bool(settings.anthropic_base_url)
+            web_fetch = web_fetch_local or not bool(settings.anthropic_base_url)
         report = await generate_research_report(
             rag_client=rag,
             query=body.query,
@@ -98,6 +115,7 @@ async def create_research_report(
             max_tokens=settings.anthropic_max_tokens,
             use_web=use_web,
             web_fetch=web_fetch,
+            web_fetch_local=web_fetch_local,
         )
         # Defensive: the agent guarantees a title, but never serve a payload
         # that the UI would treat as an empty response.

@@ -83,6 +83,7 @@
         model: opts.model || 'claude-sonnet-4-20250514',
         use_web: opts.useWeb,
         use_web_fetch: opts.useWebFetch,
+        use_web_fetch_local: opts.useWebFetchLocal,
       });
     },
 
@@ -311,6 +312,7 @@
         model: els.researchModel.value,
         useWeb: els.researchUseWeb.checked,
         useWebFetch: els.researchUseWebFetch.checked,
+        useWebFetchLocal: els.researchUseWebFetchLocal.checked,
       });
 
       status.classList.add('hidden');
@@ -491,6 +493,7 @@
       researchModel: document.getElementById('researchModel'),
       researchUseWeb: document.getElementById('researchUseWeb'),
       researchUseWebFetch: document.getElementById('researchUseWebFetch'),
+      researchUseWebFetchLocal: document.getElementById('researchUseWebFetchLocal'),
       researchStatus: document.getElementById('researchStatus'),
       researchStatusText: document.getElementById('researchStatusText'),
       researchResults: document.getElementById('researchResults'),

@@ -28,6 +28,13 @@ class ReportRequest(BaseModel):
     collection_name: str = "documents"
     limit: int = Field(default=10, ge=1, le=50)
     model: str = "claude-sonnet-4-20250514"
+    use_web: bool | None = Field(
+        default=None,
+        description=(
+            "Augment RAG findings with web search/fetch. "
+            "Defaults to the server RESEARCH_USE_WEB setting."
+        ),
+    )
 
 
 class AskRequest(BaseModel):
@@ -61,6 +68,7 @@ async def create_research_report(
         )
 
     try:
+        use_web = settings.research_use_web if body.use_web is None else body.use_web
         report = await generate_research_report(
             rag_client=rag,
             query=body.query,
@@ -70,6 +78,7 @@ async def create_research_report(
             base_url=settings.anthropic_base_url,
             model=body.model,
             max_tokens=settings.anthropic_max_tokens,
+            use_web=use_web,
         )
         # Defensive: the agent guarantees a title, but never serve a payload
         # that the UI would treat as an empty response.

@@ -115,6 +115,7 @@ Open **http://localhost:8200** in your browser.
 ### 📊 Research Reports
 - Generate structured, cited research reports from your document corpus
 - Uses pydantic-deep agents to synthesise RAG results with LLM analysis
+- **Web augmentation** — the agent can search & fetch the web (toggleable) to fill gaps in the document store with current public information
 - Executive summary, key findings, detailed sections, source citations, and identified knowledge gaps
 - Quick Q&A mode for direct questions against your documents
 
@@ -149,6 +150,7 @@ All settings via environment variables (see `.env.example`):
 | `ANTHROPIC_API_KEY` | — | API key for research agent |
 | `ANTHROPIC_BASE_URL` | — | Optional custom base URL for an Anthropic-compatible gateway |
 | `ANTHROPIC_MAX_TOKENS` | `32768` | Max output tokens for research report generation |
+| `RESEARCH_USE_WEB` | `true` | Augment RAG research with web search + page fetch |
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8200` | Server port |
 | `LOG_LEVEL` | `info` | Logging level |
@@ -176,10 +178,11 @@ The client uses verity-rag's own `schemas` models for type-safe request/response
 
 ### pydantic-deep (pydantic_deep)
 The research agent in `mysterium/agents/__init__.py` uses pydantic-deep's agent framework:
-- **`create_deep_agent`** — configures the agent with RAG search tools and web search capability
-- **Structured output** — the `ResearchReport` Pydantic model is used as `output_type` for type-safe report generation
-- **Tool-use** — the agent calls RAG search as a tool, retrieves context, then synthesises the report
-- **Subagent delegation** — for complex research, the main agent delegates to specialised subagents (researcher, writer, fact-checker)
+- **`create_deep_agent`** — drives report generation, wired with custom RAG tools and web search capability
+- **Custom RAG tools** — `rag_search` / `list_collections` are async functions that query verity-rag via `ctx.deps` (a `DeepAgentDeps` subclass carrying the `RAGClient`)
+- **Web tools** — `web_search` + `web_fetch` are enabled by default so the agent extends private documents with live public sources
+- **Structured output** — the `ResearchReport` Pydantic model is set as `output_type`, so the model must produce a validated report (no manual JSON parsing)
+- **Headless mode** — filesystem, shell, sub-agents and persistent memory are disabled for the single-shot API task; the model's HTTP client is closed after each run via `async with agent`
 
 ## License
 

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Maximum output tokens for research report generation
     anthropic_max_tokens: int = 32768
 
+    # Augment RAG research with web search + page fetch (default: on)
+    research_use_web: bool = True
+
     # FastAPI server config
     host: str = "0.0.0.0"
     port: int = 8200

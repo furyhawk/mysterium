@@ -81,6 +81,7 @@
         collection_name: opts.collection || 'documents',
         limit: opts.limit || 10,
         model: opts.model || 'claude-sonnet-4-20250514',
+        use_web: opts.useWeb,
       });
     },
 
@@ -297,7 +298,9 @@
 
     btn.disabled = true;
     status.classList.remove('hidden');
-    statusText.textContent = 'Searching documents and generating report…';
+    statusText.textContent = els.researchUseWeb.checked
+      ? 'Searching documents, the web, and generating report…'
+      : 'Searching documents and generating report…';
     container.innerHTML = '';
 
     try {
@@ -305,6 +308,7 @@
         collection: els.researchCollection.value,
         limit: parseInt(els.researchLimit.value) || 10,
         model: els.researchModel.value,
+        useWeb: els.researchUseWeb.checked,
       });
 
       status.classList.add('hidden');
@@ -483,6 +487,7 @@
       researchCollection: document.getElementById('researchCollection'),
       researchLimit: document.getElementById('researchLimit'),
       researchModel: document.getElementById('researchModel'),
+      researchUseWeb: document.getElementById('researchUseWeb'),
       researchStatus: document.getElementById('researchStatus'),
       researchStatusText: document.getElementById('researchStatusText'),
       researchResults: document.getElementById('researchResults'),

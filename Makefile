@@ -37,7 +37,15 @@ docker-push:
 PLATFORMS ?= linux/amd64,linux/arm64
 # Podman uses `build --manifest` + `manifest push`; Docker uses `buildx build --push`
 ifeq ($(DOCKER),podman)
+# `podman build --manifest` + `manifest push --all` fail with "image is not a
+# manifest list" if the target names are already taken by single-arch images
+# (e.g. from a prior `make docker-build`). Clear any stale refs first so the
+# build registers a fresh manifest list under the version tag.
 docker-publish:
+	-$(DOCKER) rmi -f $(REGISTRY)/$(IMAGE):$(VERSION) 2>/dev/null || true
+	-$(DOCKER) rmi -f $(REGISTRY)/$(IMAGE):latest 2>/dev/null || true
+	-$(DOCKER) manifest rm $(REGISTRY)/$(IMAGE):$(VERSION) 2>/dev/null || true
+	-$(DOCKER) manifest rm $(REGISTRY)/$(IMAGE):latest 2>/dev/null || true
 	$(DOCKER) build \
 		--platform $(PLATFORMS) \
 		--manifest $(REGISTRY)/$(IMAGE):$(VERSION) \

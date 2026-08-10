@@ -24,8 +24,15 @@ class Settings(BaseSettings):
     # Maximum output tokens for research report generation
     anthropic_max_tokens: int = 32768
 
-    # Augment RAG research with web search + page fetch (default: on)
+    # Augment RAG research with web search (default: on)
     research_use_web: bool = True
+
+    # Enable web page fetch (Anthropic's server-side `web_fetch` tool).
+    # None (default) = auto: enabled with the official Anthropic API, but
+    # disabled when a custom ANTHROPIC_BASE_URL gateway is used — most
+    # Anthropic-compatible gateways (e.g. DeepSeek) reject the server-side
+    # `web_fetch_20250910` tool with HTTP 400.
+    research_web_fetch: bool | None = None
 
     # FastAPI server config
     host: str = "0.0.0.0"

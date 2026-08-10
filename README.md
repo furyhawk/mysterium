@@ -150,7 +150,8 @@ All settings via environment variables (see `.env.example`):
 | `ANTHROPIC_API_KEY` | — | API key for research agent |
 | `ANTHROPIC_BASE_URL` | — | Optional custom base URL for an Anthropic-compatible gateway |
 | `ANTHROPIC_MAX_TOKENS` | `32768` | Max output tokens for research report generation |
-| `RESEARCH_USE_WEB` | `true` | Augment RAG research with web search + page fetch |
+| `RESEARCH_USE_WEB` | `true` | Augment RAG research with web search |
+| `RESEARCH_WEB_FETCH` | `auto` | Enable web page fetch. `auto` = on with the official Anthropic API, off when `ANTHROPIC_BASE_URL` is set (most gateways reject the `web_fetch` tool) |
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8200` | Server port |
 | `LOG_LEVEL` | `info` | Logging level |

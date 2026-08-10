@@ -31,8 +31,15 @@ class ReportRequest(BaseModel):
     use_web: bool | None = Field(
         default=None,
         description=(
-            "Augment RAG findings with web search/fetch. "
+            "Augment RAG findings with web search. "
             "Defaults to the server RESEARCH_USE_WEB setting."
+        ),
+    )
+    use_web_fetch: bool | None = Field(
+        default=None,
+        description=(
+            "Fetch full web pages to augment RAG findings. "
+            "Defaults to the server RESEARCH_WEB_FETCH setting."
         ),
     )
 
@@ -69,6 +76,17 @@ async def create_research_report(
 
     try:
         use_web = settings.research_use_web if body.use_web is None else body.use_web
+        # The server-side web-fetch tool is rejected by most Anthropic-
+        # compatible gateways (it is not part of the standard tool set they
+        # deserialise). Explicitly configured RESEARCH_WEB_FETCH wins; otherwise
+        # default to enabled only for the official Anthropic API (no custom
+        # base URL), and off for custom gateways.
+        if body.use_web_fetch is not None:
+            web_fetch = body.use_web_fetch
+        elif settings.research_web_fetch is not None:
+            web_fetch = settings.research_web_fetch
+        else:
+            web_fetch = not bool(settings.anthropic_base_url)
         report = await generate_research_report(
             rag_client=rag,
             query=body.query,
@@ -79,6 +97,7 @@ async def create_research_report(
             model=body.model,
             max_tokens=settings.anthropic_max_tokens,
             use_web=use_web,
+            web_fetch=web_fetch,
         )
         # Defensive: the agent guarantees a title, but never serve a payload
         # that the UI would treat as an empty response.

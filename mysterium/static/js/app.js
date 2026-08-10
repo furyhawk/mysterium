@@ -82,6 +82,7 @@
         limit: opts.limit || 10,
         model: opts.model || 'claude-sonnet-4-20250514',
         use_web: opts.useWeb,
+        use_web_fetch: opts.useWebFetch,
       });
     },
 
@@ -309,6 +310,7 @@
         limit: parseInt(els.researchLimit.value) || 10,
         model: els.researchModel.value,
         useWeb: els.researchUseWeb.checked,
+        useWebFetch: els.researchUseWebFetch.checked,
       });
 
       status.classList.add('hidden');
@@ -488,6 +490,7 @@
       researchLimit: document.getElementById('researchLimit'),
       researchModel: document.getElementById('researchModel'),
       researchUseWeb: document.getElementById('researchUseWeb'),
+      researchUseWebFetch: document.getElementById('researchUseWebFetch'),
       researchStatus: document.getElementById('researchStatus'),
       researchStatusText: document.getElementById('researchStatusText'),
       researchResults: document.getElementById('researchResults'),

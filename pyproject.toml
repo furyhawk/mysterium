@@ -1,6 +1,6 @@
 [project]
 name = "mysterium"
-version = "0.2.0"
+version = "0.2.1"
 description = "RAG-powered research platform — upload documents, search with verity-rag, and synthesize reports with pydantic-deep agents"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -15,7 +15,7 @@ dependencies = [
     "pydantic-deep>=0.3.20",
     "pydantic-settings>=2.14.2",
     "uvicorn>=0.51.0",
-    "verity-rag>=0.1.5",
+    "verity-rag>=0.2.0",
 ]
 
 [project.urls]

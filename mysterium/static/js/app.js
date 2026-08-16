@@ -333,6 +333,13 @@
     }
 
     const findings = (report.key_findings || []).map(f => `<li>${escapeHtml(f)}</li>`).join('');
+    const images = (report.images || []).map(im => `
+      <figure class="report-image">
+        <img src="/api/images/${encodeURIComponent(im.image_id)}"
+             alt="${escapeHtml(im.description || 'Report image')}" loading="lazy" />
+        ${im.description ? `<figcaption>${escapeHtml(im.description)}${im.page_num != null ? ` — p.${im.page_num}` : ''}</figcaption>` : ''}
+      </figure>
+    `).join('');
     const gaps = (report.gaps || []).map(g => `<li>${escapeHtml(g)}</li>`).join('');
     const sources = (report.sources || []).map(s => `
       <div class="report-source">
@@ -364,6 +371,7 @@
           </button>
         </div>
         ${report.summary ? `<div class="report-summary">${escapeHtml(report.summary).replace(/\n/g, '<br/>')}</div>` : ''}
+        ${images ? `<h3 style="margin-bottom:8px">🖼️ Images</h3><div class="report-images">${images}</div>` : ''}
         ${findings ? `<h3 style="margin-bottom:8px">🔑 Key Findings</h3><ul class="report-findings">${findings}</ul>` : ''}
         ${sections}
         ${gaps ? `<h3 style="margin-bottom:8px">⚠️ Knowledge Gaps</h3><ul class="report-gaps">${gaps}</ul>` : ''}
@@ -406,6 +414,17 @@
     if (report.summary) {
       lines.push('## Summary\n');
       lines.push(report.summary + '\n');
+    }
+
+    // Images
+    if (report.images?.length) {
+      lines.push('## Images\n');
+      report.images.forEach(im => {
+        const src = im.url || `/api/images/${encodeURIComponent(im.image_id)}`;
+        lines.push(`![${im.description || 'Image'}](${src})`);
+        if (im.page_num != null) lines.push(`*Page ${im.page_num}*`);
+        lines.push('');
+      });
     }
 
     // Key findings

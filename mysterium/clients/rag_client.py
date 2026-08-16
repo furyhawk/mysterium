@@ -8,11 +8,33 @@ API reference: https://pypi.org/project/verity-rag/
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+
+class RAGImageNotFoundError(Exception):
+    """Raised when a requested image does not exist on the RAG server."""
+
+
+@dataclass
+class SearchResultImage:
+    """An image extracted from a document, attached to a search result.
+
+    Mirrors the verity-rag ``SearchResultImage`` schema. The RAG server stores
+    images extracted during ingestion and serves their raw bytes at
+    ``GET /api/v1/images/{image_id}``.
+    """
+
+    image_id: str
+    url: str = ""
+    mime_type: str = "image/png"
+    page_num: int = 0
+    width: int | None = None
+    height: int | None = None
+    description: str = ""
 
 
 @dataclass
@@ -24,6 +46,20 @@ class SearchResult:
     metadata: dict[str, Any]
     parent_doc_id: str | None = None
     chunk_id: str | None = None
+    images: list[SearchResultImage] = field(default_factory=list)
+
+
+def _parse_image(item: dict[str, Any]) -> SearchResultImage:
+    """Build a ``SearchResultImage`` from a verity-rag image dict."""
+    return SearchResultImage(
+        image_id=item["image_id"],
+        url=item.get("url", ""),
+        mime_type=str(item.get("mime_type", "image/png")),
+        page_num=int(item.get("page_num", 0)),
+        width=item.get("width"),
+        height=item.get("height"),
+        description=str(item.get("description", "")),
+    )
 
 
 @dataclass
@@ -251,6 +287,7 @@ class RAGClient:
                 metadata=item.get("metadata", {}),
                 parent_doc_id=item.get("parent_doc_id"),
                 chunk_id=item.get("chunk_id"),
+                images=[_parse_image(im) for im in (item.get("images") or [])],
             )
             for item in data.get("results", [])
         ]
@@ -279,6 +316,32 @@ class RAGClient:
                 metadata=item.get("metadata", {}),
                 parent_doc_id=item.get("parent_doc_id"),
                 chunk_id=item.get("chunk_id"),
+                images=[_parse_image(im) for im in (item.get("images") or [])],
             )
             for item in data.get("results", [])
         ]
+
+    # ── Images ───────────────────────────────────────────────────────
+
+    async def get_image(self, image_id: str) -> tuple[bytes, str]:
+        """Fetch a persisted document image by its ID.
+
+        Retrieves the raw image bytes served by verity-rag at
+        ``GET /api/v1/images/{image_id}`` (the default ``format=raw`` mode).
+
+        Args:
+            image_id: ID of the extracted image.
+
+        Returns:
+            A ``(raw_bytes, mime_type)`` tuple, e.g. ``(b"...", "image/png")``.
+
+        Raises:
+            RAGImageNotFoundError: when the image does not exist (HTTP 404).
+            httpx.HTTPError: for any other transport or server error.
+        """
+        resp = await self._client.get(f"/api/v1/images/{image_id}")
+        if resp.status_code == 404:
+            raise RAGImageNotFoundError(image_id)
+        resp.raise_for_status()
+        mime_type = resp.headers.get("content-type", "image/png")
+        return resp.content, mime_type

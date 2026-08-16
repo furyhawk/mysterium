@@ -600,6 +600,35 @@ a:hover { text-decoration: underline; }
   margin-bottom: 24px;
 }
 
+.report-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.report-image {
+  flex: 0 1 300px;
+  margin: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.report-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.report-image figcaption {
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 /* ── Empty / Error States ─────────────────────────────────────────── */
 .empty-state {
   text-align: center;

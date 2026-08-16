@@ -44,9 +44,10 @@ async def get_version() -> dict[str, str]:
     return {"version": __version__}
 
 
-from mysterium.routers import documents, research  # noqa: E402
+from mysterium.routers import documents, images, research  # noqa: E402
 
 app.include_router(documents.router)
+app.include_router(images.router)
 app.include_router(research.router)
 
 

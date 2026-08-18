@@ -19,22 +19,22 @@ The streaming contract mirrors the research agent: a sequence of
 The agent is built with a plain pydantic-ai :class:`~pydantic_ai.Agent`
 (no deep-agent orchestration) — chat is single-agent tool use, not a
 multi-agent research graph.
+
+The RAG tools and streaming phase labels are shared with the research agent —
+see :mod:`mysterium.agents.tools` and :mod:`mysterium.agents.progress`.
 """
 
 from __future__ import annotations
 
 import datetime
-import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import httpx
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from pydantic_ai.capabilities import WebFetch, WebSearch
 from pydantic_ai.messages import (
-    FinalResultEvent,
     FunctionToolCallEvent,
     ModelMessage,
     ModelRequest,
@@ -48,14 +48,13 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
-from mysterium.clients.rag_client import (
-    RAGClient,
-    RAGImageNotFoundError,
-    SearchResult,
-    SearchResultImage,
+from mysterium.agents.progress import GENERATING_PHASE, TOOL_PHASES, progress_phase
+from mysterium.agents.tools import (
+    get_report_image,
+    list_collections,
+    rag_search,
 )
-
-logger = logging.getLogger(__name__)
+from mysterium.clients.rag_client import RAGClient, SearchResult, SearchResultImage
 
 
 # ── Wire Message Model ─────────────────────────────────────────────
@@ -99,112 +98,6 @@ class ChatDeps:
     sources: list[SearchResult] = field(default_factory=list)
     images: list[SearchResultImage] = field(default_factory=list)
     validated_image_ids: set[str] = field(default_factory=set)
-
-
-# ── Custom Tools (private RAG) ──────────────────────────────────────
-
-
-async def rag_search(ctx: RunContext[ChatDeps], query: str, limit: int = 5) -> str:
-    """Search the private RAG document store for relevant excerpts.
-
-    Use this to ground your answer in the user's uploaded documents — it is
-    the primary source of truth. Each excerpt is labelled
-    ``[n] Source: <filename> (score: ...)`` so you can cite it in your answer.
-
-    Args:
-        query: The natural-language search query.
-        limit: Maximum number of excerpts to return (1-50, default 5).
-    """
-    limit = max(1, min(int(limit), 50))
-    try:
-        results = await ctx.deps.rag_client.search(
-            query=query,
-            collection_name=ctx.deps.collection_name,
-            limit=limit,
-        )
-    except httpx.HTTPError as e:  # Return errors as strings so the agent can recover.
-        logger.warning("chat rag_search failed for %r: %s", query, e)
-        return f"RAG search failed: {e}"
-
-    if not results:
-        return (
-            f"No documents in collection {ctx.deps.collection_name!r} matched "
-            f"{query!r}. Say so in your answer rather than guessing."
-        )
-
-    # Record what was retrieved so the turn can cite the actual sources, and
-    # collect the images each result surfaced so the UI can render them.
-    ctx.deps.sources.extend(results)
-    for r in results:
-        if r.images:
-            ctx.deps.images.extend(r.images)
-
-    blocks = []
-    for i, r in enumerate(results, 1):
-        source = r.metadata.get("filename") or r.parent_doc_id or f"result-{i}"
-        block = f"[{i}] Source: {source} (score: {r.score:.3f})\n{r.content}"
-        if r.images:
-            image_lines = []
-            for img in r.images:
-                caption = f' "{img.description}"' if img.description else ""
-                image_lines.append(
-                    f"        - image_id={img.image_id} "
-                    f"page={img.page_num} mime={img.mime_type}{caption}"
-                )
-            block += "\n    Images in this result:\n" + "\n".join(image_lines)
-        blocks.append(block)
-    return "\n\n---\n\n".join(blocks)
-
-
-async def get_report_image(ctx: RunContext[ChatDeps], image_id: str) -> str:
-    """Fetch a document image from the RAG store so it can be shared in chat.
-
-    Use this to validate an image that `rag_search` surfaced (by its
-    ``image_id``) before describing it or pointing the user to it. Returns the
-    image's size and MIME type as confirmation.
-
-    Args:
-        image_id: The image ID shown in a `rag_search` result.
-    """
-    try:
-        data, mime_type = await ctx.deps.rag_client.get_image(image_id)
-    except RAGImageNotFoundError:
-        return (
-            f"Image {image_id!r} was not found on the RAG server — do not "
-            "reference it."
-        )
-    except httpx.HTTPError as e:
-        logger.warning("chat get_report_image failed for %r: %s", image_id, e)
-        return f"Fetching image {image_id!r} failed: {e}"
-    # Record the validated image so the chat UI can display it. It was already
-    # collected (with its description/page) if `rag_search` surfaced it; if the
-    # agent validated an image directly, add a minimal entry.
-    ctx.deps.validated_image_ids.add(image_id)
-    if not any(img.image_id == image_id for img in ctx.deps.images):
-        ctx.deps.images.append(
-            SearchResultImage(image_id=image_id, mime_type=mime_type)
-        )
-    return (
-        f"Image {image_id!r} fetched successfully ({mime_type}, "
-        f"{len(data)} bytes). You may mention it in your answer and note its "
-        "image_id."
-    )
-
-
-async def list_collections(ctx: RunContext[ChatDeps]) -> str:
-    """List the names of the available RAG document collections.
-
-    Returns one collection name per line, or a short message when there are
-    none.
-    """
-    try:
-        collections = await ctx.deps.rag_client.list_collections()
-    except httpx.HTTPError as e:
-        logger.warning("chat list_collections failed: %s", e)
-        return f"Listing RAG collections failed: {e}"
-    if not collections:
-        return "No document collections are available."
-    return "\n".join(c.name for c in collections)
 
 
 # ── Agent Factory ───────────────────────────────────────────────────
@@ -312,28 +205,9 @@ def _to_model_messages(history: list[ChatMessage] | None) -> list[ModelMessage]:
 
 
 # ── Streaming Progress ─────────────────────────────────────────────
-
-
-#: Human-friendly phase labels shown while the agent works, keyed by the tool
-#: names pydantic-ai emits in `FunctionToolCallEvent`s as the agent runs.
-_TOOL_PHASES: dict[str, str] = {
-    "rag_search": "Searching your documents…",
-    "list_collections": "Listing document collections…",
-    "get_report_image": "Fetching a document image…",
-    "web_search": "Searching the web…",
-    # The local markdownify tool and Anthropic's server-side web-fetch tool
-    # both surface under the same tool name.
-    "web_fetch": "Fetching a web page…",
-    "web_fetch_20250910": "Fetching a web page…",
-}
-
-#: Phase shown once the model starts producing the answer text.
-_GENERATING_PHASE = "Generating answer…"
-
-
-def _progress_phase(message: str, tool: str) -> dict[str, Any]:
-    """Build a progress event dict for streaming clients."""
-    return {"type": "phase", "message": message, "tool": tool}
+#
+# Phase labels and the phase-event builder are shared with the research agent
+# (see mysterium.agents.progress) and imported at the top of this module.
 
 
 def _source_to_dict(result: SearchResult) -> dict[str, Any]:
@@ -471,7 +345,7 @@ async def stream_chat_response(
     )
     history_messages = _to_model_messages(history)
 
-    yield _progress_phase("Thinking…", "thinking")
+    yield progress_phase("Thinking…", "thinking")
 
     text_parts: list[str] = []
     generating = False
@@ -493,8 +367,8 @@ async def stream_chat_response(
                                     and getattr(part, "part_kind", None) == "text"
                                 ):
                                     generating = True
-                                    yield _progress_phase(
-                                        _GENERATING_PHASE, "generate"
+                                    yield progress_phase(
+                                        GENERATING_PHASE, "generate"
                                     )
                                 # Anthropic delivers the first text chunk inside
                                 # the PartStartEvent's TextPart (later chunks
@@ -521,9 +395,9 @@ async def stream_chat_response(
                     async with node.stream(agent_run.ctx) as stream:
                         async for event in stream:
                             if isinstance(event, FunctionToolCallEvent):
-                                phase = _TOOL_PHASES.get(event.part.tool_name)
+                                phase = TOOL_PHASES.get(event.part.tool_name)
                                 if phase:
-                                    yield _progress_phase(
+                                    yield progress_phase(
                                         phase, event.part.tool_name
                                     )
 

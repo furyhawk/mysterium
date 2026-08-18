@@ -63,6 +63,20 @@ docker-publish:
 		.
 endif
 
+# ── Release & Tagging ──────────────────────────────────────────────
+
+## Create and push the git release tag for the current version (e.g. v0.2.2)
+tag:
+	$(PYTHON) scripts/tag_version.py
+
+## Create the release tag locally without pushing
+tag-local:
+	$(PYTHON) scripts/tag_version.py --no-push
+
+## Validate the current version and preview the tag that would be created
+tag-dry-run:
+	$(PYTHON) scripts/tag_version.py --dry-run --no-push
+
 ## Build and start all services in detached mode
 up:
 	$(COMPOSE) up -d

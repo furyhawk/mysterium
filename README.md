@@ -46,6 +46,9 @@ make destroy        # Stop & remove everything INCLUDING data volumes
 make shell          # Open a shell in the mysterium container
 make health         # Check health of both services
 make docker-publish # Build and push multi-arch images for linux/amd64 and linux/arm64
+make tag            # Create and push the git release tag (e.g. v0.2.2)
+make tag-local      # Create the release tag locally without pushing
+make tag-dry-run    # Validate the version and preview the tag
 make help           # Show all targets
 ```
 
@@ -217,6 +220,31 @@ Or use the Makefile shortcuts: `make ui-install`, `make ui-build`, `make ui-dev`
 
 > The Docker image builds the frontend automatically in a Node stage, so the
 > container always ships a freshly built bundle.
+
+## Releasing
+
+The version is single-sourced in `pyproject.toml` (mirrored in
+`mysterium/__init__.py`). After bumping it, commit the bump, then tag the
+release:
+
+```bash
+git add pyproject.toml mysterium/__init__.py uv.lock
+git commit -m "chore: release v0.2.2"
+
+make tag            # creates annotated tag v<version> and pushes it to origin
+# make tag-local    # create the tag locally without pushing
+# make tag-dry-run  # validate + preview the tag without changing anything
+```
+
+`make tag` (backed by `scripts/tag_version.py`) refuses to tag when:
+
+- the tag for the current version already exists,
+- the version is not an uptick over the latest `v*` tag, or
+- the version files (`pyproject.toml`, `mysterium/__init__.py`, `uv.lock`) have
+  uncommitted changes.
+
+Override those guards with `scripts/tag_version.py --force` only when you know
+what you're doing.
 
 ## How It Uses the Libraries
 

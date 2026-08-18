@@ -740,8 +740,184 @@ a:hover { text-decoration: underline; }
   white-space: pre-wrap;
 }
 
+/* Assistant bubbles contain rendered markdown HTML — let the layout flow. */
+.chat-msg.assistant .chat-bubble-content {
+  white-space: normal;
+}
+
 .chat-bubble-content.chat-error {
   color: var(--text-danger);
+}
+
+/* Markdown typography inside assistant bubbles */
+.chat-bubble-content > :first-child { margin-top: 0; }
+.chat-bubble-content > :last-child { margin-bottom: 0; }
+
+.chat-bubble-content p {
+  margin: 0 0 8px;
+}
+.chat-bubble-content p:last-child { margin-bottom: 0; }
+
+.chat-bubble-content h1,
+.chat-bubble-content h2,
+.chat-bubble-content h3,
+.chat-bubble-content h4,
+.chat-bubble-content h5,
+.chat-bubble-content h6 {
+  margin: 12px 0 6px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.chat-bubble-content h1 { font-size: 1.15rem; }
+.chat-bubble-content h2 { font-size: 1.05rem; }
+.chat-bubble-content h3 { font-size: 0.98rem; }
+.chat-bubble-content h4, .chat-bubble-content h5, .chat-bubble-content h6 { font-size: 0.92rem; }
+
+.chat-bubble-content ul,
+.chat-bubble-content ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.chat-bubble-content li {
+  margin: 2px 0;
+}
+.chat-bubble-content li > ul,
+.chat-bubble-content li > ol {
+  margin-bottom: 0;
+}
+
+.chat-bubble-content code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.chat-bubble-content pre {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.chat-bubble-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+}
+
+.chat-bubble-content blockquote {
+  margin: 0 0 8px;
+  padding: 2px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.chat-bubble-content a {
+  color: var(--text-accent);
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.chat-bubble-content hr {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: 12px 0;
+}
+
+.chat-bubble-content strong { font-weight: 600; }
+.chat-bubble-content em { font-style: italic; }
+.chat-bubble-content del { color: var(--text-muted); }
+
+.chat-bubble-content img {
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 4px 0;
+}
+
+.chat-bubble-content table {
+  border-collapse: collapse;
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  width: 100%;
+}
+.chat-bubble-content th,
+.chat-bubble-content td {
+  border: 1px solid var(--border-primary);
+  padding: 4px 8px;
+  text-align: left;
+}
+.chat-bubble-content th {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* RAG image strip under an assistant bubble */
+.chat-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chat-image {
+  flex: 0 1 160px;
+  margin: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.chat-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: zoom-in;
+}
+
+.chat-image figcaption {
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Click-to-zoom lightbox for RAG images */
+.chat-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  cursor: zoom-out;
+  animation: chatIn 160ms ease;
+}
+
+.chat-lightbox img {
+  max-width: 100%;
+  max-height: 85vh;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.chat-lightbox-caption {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 /* Sources collapsible under an assistant bubble */

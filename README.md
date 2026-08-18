@@ -124,6 +124,8 @@ Open **http://localhost:8200** in your browser.
 - The agent *decides* when to search your documents (`rag_search`), discover collections (`list_collections`), and validate images (`get_report_image`)
 - Optional web search & page fetch to fill gaps (toggleable, same gateway-safe local fetch as research)
 - **Token-level streaming** — answers render live in the chat bubble with a working indicator showing the current tool phase
+- **Markdown rendering** — answers display formatted (headings, lists, bold/italic, code, tables, links) instead of raw markdown
+- **Document images** — images the agent retrieves/validates from your documents render as clickable thumbnails under the answer
 - **Cited sources** — every answer carries a collapsible list of the documents the agent actually retrieved
 - Stateless server: the client owns the conversation history, sent with each turn (`POST /api/chat/stream`)
 - Quick Q&A mode for direct questions against your documents

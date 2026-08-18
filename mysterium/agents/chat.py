@@ -48,7 +48,12 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
-from mysterium.clients.rag_client import RAGClient, RAGImageNotFoundError, SearchResult
+from mysterium.clients.rag_client import (
+    RAGClient,
+    RAGImageNotFoundError,
+    SearchResult,
+    SearchResultImage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +86,19 @@ class ChatDeps:
     ``sources`` is a per-run collector: the ``rag_search`` tool appends every
     ``SearchResult`` it returns so the final stream event can cite exactly the
     documents the agent actually retrieved.
+
+    ``images`` and ``validated_image_ids`` mirror that pattern for document
+    images: ``rag_search`` collects the images it surfaces from each result,
+    and ``get_report_image`` marks the ones the agent validated as existing,
+    so the final message can render them in the chat UI.
     """
 
     rag_client: RAGClient = field(default_factory=RAGClient)
     collection_name: str = "documents"
     rag_limit: int = 5
     sources: list[SearchResult] = field(default_factory=list)
+    images: list[SearchResultImage] = field(default_factory=list)
+    validated_image_ids: set[str] = field(default_factory=set)
 
 
 # ── Custom Tools (private RAG) ──────────────────────────────────────
@@ -120,8 +132,12 @@ async def rag_search(ctx: RunContext[ChatDeps], query: str, limit: int = 5) -> s
             f"{query!r}. Say so in your answer rather than guessing."
         )
 
-    # Record what was retrieved so the turn can cite the actual sources.
+    # Record what was retrieved so the turn can cite the actual sources, and
+    # collect the images each result surfaced so the UI can render them.
     ctx.deps.sources.extend(results)
+    for r in results:
+        if r.images:
+            ctx.deps.images.extend(r.images)
 
     blocks = []
     for i, r in enumerate(results, 1):
@@ -160,6 +176,14 @@ async def get_report_image(ctx: RunContext[ChatDeps], image_id: str) -> str:
     except httpx.HTTPError as e:
         logger.warning("chat get_report_image failed for %r: %s", image_id, e)
         return f"Fetching image {image_id!r} failed: {e}"
+    # Record the validated image so the chat UI can display it. It was already
+    # collected (with its description/page) if `rag_search` surfaced it; if the
+    # agent validated an image directly, add a minimal entry.
+    ctx.deps.validated_image_ids.add(image_id)
+    if not any(img.image_id == image_id for img in ctx.deps.images):
+        ctx.deps.images.append(
+            SearchResultImage(image_id=image_id, mime_type=mime_type)
+        )
     return (
         f"Image {image_id!r} fetched successfully ({mime_type}, "
         f"{len(data)} bytes). You may mention it in your answer and note its "
@@ -338,6 +362,44 @@ def _dedup_sources(sources: list[SearchResult]) -> list[SearchResult]:
     return unique
 
 
+#: Maximum number of images included in the final chat message event.
+_MAX_CHAT_IMAGES = 6
+
+
+def _image_to_dict(image: SearchResultImage) -> dict[str, Any]:
+    """Serialize one RAG image for the final stream event."""
+    return {
+        "image_id": image.image_id,
+        "url": image.url,
+        "description": image.description,
+        "page_num": image.page_num,
+        "mime_type": image.mime_type,
+        "width": image.width,
+        "height": image.height,
+    }
+
+
+def _dedup_images(
+    images: list[SearchResultImage], validated: set[str]
+) -> list[SearchResultImage]:
+    """De-duplicate images by id, images the agent validated first, capped."""
+    seen: set[str] = set()
+    unique: list[SearchResultImage] = []
+    # False sorts before True, so validated images (image_id in `validated`)
+    # come first; ties broken by image_id for a stable order.
+    ordered = sorted(
+        images, key=lambda i: (i.image_id not in validated, i.image_id)
+    )
+    for img in ordered:
+        if img.image_id in seen:
+            continue
+        seen.add(img.image_id)
+        unique.append(img)
+        if len(unique) >= _MAX_CHAT_IMAGES:
+            break
+    return unique
+
+
 async def stream_chat_response(
     rag_client: RAGClient,
     message: str,
@@ -364,9 +426,14 @@ async def stream_chat_response(
     - ``{"type": "token", "text": str}`` — an incremental chunk of the answer
       text, so a client can stream it straight into the message bubble.
     - ``{"type": "message", "message": {...}}`` — the final assistant message
-      ``{role, content, sources}``. Always the last event.
+      ``{role, content, sources, images}``. Always the last event.
     - ``{"type": "error", "message": str}`` — raised only as a Python exception
       from this generator; the router converts it to an SSE error event.
+
+    ``content`` is the raw markdown answer text; ``sources`` lists the
+    documents the agent retrieved, and ``images`` lists the document images it
+    surfaced (validated ones first) so the chat UI can render them. Both are
+    advisory — the answer text itself carries the inline ``[n]`` citations.
 
     Args:
         rag_client: Connected RAG client.
@@ -475,12 +542,17 @@ async def stream_chat_response(
                     reverse=True,
                 )
             ]
+            images = [
+                _image_to_dict(img)
+                for img in _dedup_images(deps.images, deps.validated_image_ids)
+            ]
             yield {
                 "type": "message",
                 "message": {
                     "role": "assistant",
                     "content": content,
                     "sources": sources,
+                    "images": images,
                     "generated_at": datetime.datetime.now(datetime.UTC).isoformat(),
                 },
             }

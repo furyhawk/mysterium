@@ -480,12 +480,36 @@ a:hover { text-decoration: underline; }
 /* ── Research Results ─────────────────────────────────────────────── */
 .research-status {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 16px;
   background: var(--bg-tertiary);
   border-radius: var(--radius);
   margin-bottom: 16px;
+}
+
+.research-status-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Live progress feedback while the report is being generated */
+.research-step-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 104px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.research-step:last-child {
+  color: var(--text-accent);
+  font-weight: 500;
 }
 
 .research-report {

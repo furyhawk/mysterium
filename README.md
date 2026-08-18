@@ -116,6 +116,7 @@ Open **http://localhost:8200** in your browser.
 - Generate structured, cited research reports from your document corpus
 - Uses pydantic-deep agents to synthesise RAG results with LLM analysis
 - **Web augmentation** — the agent can search & fetch the web (toggleable) to fill gaps in the document store with current public information
+- **Live progress feedback** — the UI streams phases as they happen ("Searching your documents…", "Searching the web…", "Fetching a web page…", "Synthesizing the final report…") while the report is generated
 - Executive summary, key findings, detailed sections, source citations, and identified knowledge gaps
 - Quick Q&A mode for direct questions against your documents
 
@@ -137,8 +138,15 @@ Open **http://localhost:8200** in your browser.
 ### Research
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/research/report` | Generate full research report |
+| `POST` | `/api/research/report` | Generate full research report (returns when done) |
+| `POST` | `/api/research/report/stream` | Generate research report with live SSE progress phases |
 | `POST` | `/api/research/ask` | Quick Q&A from RAG context |
+
+The streaming endpoint (`/api/research/report/stream`) returns a
+`text/event-stream` of JSON events:
+`{"type": "phase", "message": "...", "tool": "..."}` for each phase the agent
+reaches, followed by `{"type": "report", "report": {...}}` with the final
+structured report (or `{"type": "error", "message": "..."}` on failure).
 
 ## Configuration
 

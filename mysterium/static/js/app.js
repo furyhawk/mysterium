@@ -75,18 +75,6 @@
       });
     },
 
-    async research(query, opts) {
-      return this.post('/api/research/report', {
-        query,
-        collection_name: opts.collection || 'documents',
-        limit: opts.limit || 10,
-        model: opts.model || 'claude-sonnet-4-20250514',
-        use_web: opts.useWeb,
-        use_web_fetch: opts.useWebFetch,
-        use_web_fetch_local: opts.useWebFetchLocal,
-      });
-    },
-
     async ask(question, opts) {
       return this.post('/api/research/ask', {
         question,
@@ -289,6 +277,74 @@
   }
 
   // ── Research ──────────────────────────────────────────────────────
+  // Streams Server-Sent Events from POST /api/research/report/stream and
+  // resolves with the final report. `handlers.onPhase(evt)` is called for
+  // each live progress phase as it arrives.
+  async function streamReport(payload, handlers) {
+    const res = await fetch('/api/research/report/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `Stream failed (${res.status})`);
+    }
+    if (!res.body) throw new Error('Streaming is not supported by this browser');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let report = null;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sep;
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+
+        let evt;
+        try {
+          evt = JSON.parse(dataLine.slice(5).trim());
+        } catch {
+          continue;
+        }
+
+        if (evt.type === 'phase') {
+          handlers.onPhase && handlers.onPhase(evt);
+        } else if (evt.type === 'report') {
+          report = evt.report;
+        } else if (evt.type === 'error') {
+          throw new Error(evt.message || 'Report generation failed');
+        }
+      }
+    }
+
+    if (!report) throw new Error('Stream ended without a report.');
+    return report;
+  }
+
+  // Appends a completed/current step to the live progress log, collapsing
+  // consecutive repeats of the same tool so long search loops don't spam it.
+  function addResearchStep(evt) {
+    const log = els.researchStepLog;
+    if (!log) return;
+    const prev = log.lastElementChild;
+    if (prev && prev.dataset.tool === evt.tool) return;
+    const step = document.createElement('div');
+    step.className = 'research-step';
+    step.dataset.tool = evt.tool;
+    step.textContent = evt.message;
+    log.appendChild(step);
+    log.scrollTop = log.scrollHeight;
+  }
+
   async function runResearch() {
     const query = els.researchQuery.value.trim();
     if (!query) { toast('Enter a research topic', 'error'); return; }
@@ -296,23 +352,29 @@
     const container = els.researchResults;
     const status = els.researchStatus;
     const statusText = els.researchStatusText;
+    const stepLog = els.researchStepLog;
     const btn = els.researchBtn;
 
     btn.disabled = true;
     status.classList.remove('hidden');
-    statusText.textContent = els.researchUseWeb.checked
-      ? 'Searching documents, the web, and generating report…'
-      : 'Searching documents and generating report…';
+    statusText.textContent = 'Preparing the research agent…';
+    stepLog.innerHTML = '';
     container.innerHTML = '';
 
     try {
-      const report = await API.research(query, {
-        collection: els.researchCollection.value,
+      const report = await streamReport({
+        query,
+        collection_name: els.researchCollection.value,
         limit: parseInt(els.researchLimit.value) || 10,
         model: els.researchModel.value,
-        useWeb: els.researchUseWeb.checked,
-        useWebFetch: els.researchUseWebFetch.checked,
-        useWebFetchLocal: els.researchUseWebFetchLocal.checked,
+        use_web: els.researchUseWeb.checked,
+        use_web_fetch: els.researchUseWebFetch.checked,
+        use_web_fetch_local: els.researchUseWebFetchLocal.checked,
+      }, {
+        onPhase: (evt) => {
+          statusText.textContent = evt.message;
+          addResearchStep(evt);
+        },
       });
 
       status.classList.add('hidden');
@@ -515,6 +577,7 @@
       researchUseWebFetchLocal: document.getElementById('researchUseWebFetchLocal'),
       researchStatus: document.getElementById('researchStatus'),
       researchStatusText: document.getElementById('researchStatusText'),
+      researchStepLog: document.getElementById('researchStepLog'),
       researchResults: document.getElementById('researchResults'),
     };
 

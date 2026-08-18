@@ -118,6 +118,14 @@ Open **http://localhost:8200** in your browser.
 - **Web augmentation** — the agent can search & fetch the web (toggleable) to fill gaps in the document store with current public information
 - **Live progress feedback** — the UI streams phases as they happen ("Searching your documents…", "Searching the web…", "Fetching a web page…", "Synthesizing the final report…") while the report is generated
 - Executive summary, key findings, detailed sections, source citations, and identified knowledge gaps
+
+### 💬 Agentic Q&A Chat
+- Multi-turn conversational chat grounded in your RAG document store
+- The agent *decides* when to search your documents (`rag_search`), discover collections (`list_collections`), and validate images (`get_report_image`)
+- Optional web search & page fetch to fill gaps (toggleable, same gateway-safe local fetch as research)
+- **Token-level streaming** — answers render live in the chat bubble with a working indicator showing the current tool phase
+- **Cited sources** — every answer carries a collapsible list of the documents the agent actually retrieved
+- Stateless server: the client owns the conversation history, sent with each turn (`POST /api/chat/stream`)
 - Quick Q&A mode for direct questions against your documents
 
 ## API Endpoints

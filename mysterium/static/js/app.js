@@ -136,7 +136,7 @@
       const names = data.items.map(c => c.name);
       state.collections = names.length ? names : ['documents'];
 
-      const selects = ['uploadCollection', 'searchCollection', 'researchCollection', 'docFilterCollection'];
+      const selects = ['uploadCollection', 'searchCollection', 'researchCollection', 'chatCollection', 'docFilterCollection'];
       selects.forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -534,6 +534,257 @@
     return lines.join('\n');
   }
 
+  // ── Chat ─────────────────────────────────────────────────────────
+  // Multi-turn agentic Q&A grounded in the RAG store. The client owns the
+  // conversation: `chatState.messages` is the full history sent to the backend
+  // each turn (minus the new message), and each assistant turn appends a
+  // streamed bubble with a collapsible "Sources" list.
+  const chatState = {
+    messages: [],  // [{role, content}] — history sent to the backend
+    busy: false,
+  };
+
+  function chatScrollToBottom() {
+    const m = els.chatMessages;
+    if (m) m.scrollTop = m.scrollHeight;
+  }
+
+  function hideChatEmpty() {
+    const el = document.getElementById('chatEmpty');
+    if (el) el.classList.add('hidden');
+  }
+
+  // Appends a user message bubble.
+  function addChatMessage(role, content) {
+    hideChatEmpty();
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-msg ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    const contentEl = document.createElement('div');
+    contentEl.className = 'chat-bubble-content';
+    contentEl.textContent = content;
+    bubble.appendChild(contentEl);
+    wrap.appendChild(bubble);
+    els.chatMessages.appendChild(wrap);
+    chatScrollToBottom();
+  }
+
+  // Creates an empty assistant bubble and returns its content element so the
+  // streaming tokens can be appended into it.
+  function createAssistantBubble() {
+    hideChatEmpty();
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-msg assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    const contentEl = document.createElement('div');
+    contentEl.className = 'chat-bubble-content';
+    bubble.appendChild(contentEl);
+    wrap.appendChild(bubble);
+    els.chatMessages.appendChild(wrap);
+    chatScrollToBottom();
+    return contentEl;
+  }
+
+  // Live "agent is working" indicator showing the current tool phase.
+  function showChatTyping(message) {
+    hideChatEmpty();
+    removeChatTyping();
+    const el = document.createElement('div');
+    el.className = 'chat-msg assistant';
+    el.id = 'chatTyping';
+    el.innerHTML =
+      '<div class="chat-bubble chat-typing">'
+      + '<span class="chat-typing-dots"><i></i><i></i><i></i></span>'
+      + '<span class="chat-typing-text"></span>'
+      + '</div>';
+    el.querySelector('.chat-typing-text').textContent = message;
+    els.chatMessages.appendChild(el);
+    chatScrollToBottom();
+  }
+
+  function updateChatTyping(message) {
+    const el = document.getElementById('chatTyping');
+    if (el) el.querySelector('.chat-typing-text').textContent = message;
+  }
+
+  function removeChatTyping() {
+    const el = document.getElementById('chatTyping');
+    if (el) el.remove();
+  }
+
+  // Renders the collapsible list of RAG sources under an assistant bubble.
+  function renderChatSources(contentEl, sources) {
+    const details = document.createElement('details');
+    details.className = 'chat-sources';
+    const summary = document.createElement('summary');
+    summary.textContent = `📚 Sources (${sources.length})`;
+    details.appendChild(summary);
+
+    const list = document.createElement('div');
+    list.className = 'chat-sources-list';
+    sources.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'chat-source';
+      const header = document.createElement('div');
+      header.className = 'chat-source-header';
+      const name = document.createElement('span');
+      name.className = 'chat-source-name';
+      name.textContent = s.filename || 'Unknown source';
+      const score = document.createElement('span');
+      score.className = 'chat-source-score';
+      score.textContent = `Score: ${((s.score || 0) * 100).toFixed(1)}%`;
+      header.appendChild(name);
+      header.appendChild(score);
+      const excerpt = document.createElement('div');
+      excerpt.className = 'chat-source-excerpt';
+      excerpt.textContent = s.content || '';
+      item.appendChild(header);
+      item.appendChild(excerpt);
+      list.appendChild(item);
+    });
+    details.appendChild(list);
+    if (contentEl.parentElement) contentEl.parentElement.appendChild(details);
+  }
+
+  // Streams Server-Sent Events from POST /api/chat/stream and resolves with
+  // the final assistant message. `handlers.onPhase(evt)` / `onToken(text)` are
+  // called live as phases and text tokens arrive.
+  async function streamChat(payload, handlers) {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `Stream failed (${res.status})`);
+    }
+    if (!res.body) throw new Error('Streaming is not supported by this browser');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let final = null;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sep;
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+
+        let evt;
+        try {
+          evt = JSON.parse(dataLine.slice(5).trim());
+        } catch {
+          continue;
+        }
+
+        if (evt.type === 'phase') {
+          handlers.onPhase && handlers.onPhase(evt);
+        } else if (evt.type === 'token') {
+          handlers.onToken && handlers.onToken(evt.text);
+        } else if (evt.type === 'message') {
+          final = evt.message;
+        } else if (evt.type === 'error') {
+          throw new Error(evt.message || 'Chat failed');
+        }
+      }
+    }
+
+    if (!final) throw new Error('Stream ended without a message.');
+    return final;
+  }
+
+  async function sendChat() {
+    const text = els.chatInput.value.trim();
+    if (!text || chatState.busy) return;
+
+    // Commit the user message to history + UI.
+    chatState.messages.push({ role: 'user', content: text });
+    addChatMessage('user', text);
+    els.chatInput.value = '';
+    autoGrowChatInput();
+    els.chatSendBtn.disabled = true;
+    chatState.busy = true;
+
+    const contentEl = createAssistantBubble();
+    let full = '';
+    showChatTyping('Thinking…');
+
+    try {
+      const final = await streamChat({
+        message: text,
+        // History excludes the new message — the backend appends it.
+        messages: chatState.messages.slice(0, -1),
+        collection_name: els.chatCollection.value,
+        limit: parseInt(els.chatLimit.value) || 5,
+        model: els.chatModel.value,
+        use_web: els.chatUseWeb.checked,
+        use_web_fetch: els.chatUseWebFetch.checked,
+        use_web_fetch_local: els.chatUseWebFetchLocal.checked,
+      }, {
+        onPhase: (evt) => updateChatTyping(evt.message),
+        onToken: (t) => {
+          // The first token means the answer has started — drop the
+          // typing/working indicator so only the streaming bubble remains.
+          if (!full) removeChatTyping();
+          full += t;
+          contentEl.textContent = full;
+          chatScrollToBottom();
+        },
+      });
+
+      removeChatTyping();
+      // Defensive: if no tokens streamed (edge case), use the final content.
+      if (!full && final.content) contentEl.textContent = final.content;
+      if (final.sources && final.sources.length) {
+        renderChatSources(contentEl, final.sources);
+      }
+      chatState.messages.push({
+        role: 'assistant',
+        content: final.content || full,
+      });
+      chatScrollToBottom();
+    } catch (e) {
+      removeChatTyping();
+      contentEl.textContent = '⚠️ ' + e.message;
+      contentEl.classList.add('chat-error');
+    } finally {
+      chatState.busy = false;
+      els.chatSendBtn.disabled = false;
+      els.chatInput.focus();
+      chatScrollToBottom();
+    }
+  }
+
+  function clearChat() {
+    chatState.messages = [];
+    els.chatMessages.innerHTML = '';
+    const empty = document.createElement('div');
+    empty.className = 'chat-empty';
+    empty.id = 'chatEmpty';
+    empty.innerHTML =
+      '<div class="chat-empty-icon">💬</div>'
+      + '<p>Ask a question about your documents.</p>'
+      + '<p class="chat-empty-hint">e.g. "What are the key findings in the quarterly report?"</p>';
+    els.chatMessages.appendChild(empty);
+    els.chatInput.focus();
+    autoGrowChatInput();
+  }
+
+  function autoGrowChatInput() {
+    els.chatInput.style.height = 'auto';
+    els.chatInput.style.height = Math.min(els.chatInput.scrollHeight, 160) + 'px';
+  }
+
   // ── Initialization ────────────────────────────────────────────────
   async function loadVersion() {
     try {
@@ -579,6 +830,17 @@
       researchStatusText: document.getElementById('researchStatusText'),
       researchStepLog: document.getElementById('researchStepLog'),
       researchResults: document.getElementById('researchResults'),
+      chatCollection: document.getElementById('chatCollection'),
+      chatLimit: document.getElementById('chatLimit'),
+      chatModel: document.getElementById('chatModel'),
+      chatUseWeb: document.getElementById('chatUseWeb'),
+      chatUseWebFetch: document.getElementById('chatUseWebFetch'),
+      chatUseWebFetchLocal: document.getElementById('chatUseWebFetchLocal'),
+      chatClear: document.getElementById('chatClear'),
+      chatMessages: document.getElementById('chatMessages'),
+      chatInput: document.getElementById('chatInput'),
+      chatSendBtn: document.getElementById('chatSendBtn'),
+      chatEmpty: document.getElementById('chatEmpty'),
     };
 
     // Tab switching
@@ -626,6 +888,18 @@
     els.researchQuery.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') runResearch();
     });
+
+    // Chat
+    els.chatSendBtn.addEventListener('click', sendChat);
+    els.chatInput.addEventListener('keydown', (e) => {
+      // Enter sends; Shift+Enter inserts a newline.
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+    els.chatInput.addEventListener('input', autoGrowChatInput);
+    els.chatClear.addEventListener('click', clearChat);
 
     // Refresh docs
     els.refreshDocs.addEventListener('click', () => {

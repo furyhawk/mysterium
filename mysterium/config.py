@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     # every Anthropic-compatible gateway, so it defaults to True.
     research_web_fetch_local: bool = True
 
+    # Agentic Q&A chat agent — augment RAG answers with web search
+    chat_use_web: bool = True
+
+    # Enable web page fetch for the chat agent. None (default) = auto: enabled
+    # with the official Anthropic API, disabled when a custom ANTHROPIC_BASE_URL
+    # gateway is used AND the local fetch tool is off (gateways reject the
+    # server-side `web_fetch_20250910` tool).
+    chat_web_fetch: bool | None = None
+
+    # Fetch web pages with a LOCAL markdownify-based tool for the chat agent.
+    # Works with every Anthropic-compatible gateway, so it defaults to True.
+    chat_web_fetch_local: bool = True
+
     # FastAPI server config
     host: str = "0.0.0.0"
     port: int = 8200

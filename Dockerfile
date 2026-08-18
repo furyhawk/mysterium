@@ -1,3 +1,17 @@
+# ── Frontend build stage ────────────────────────────────────────────
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN cd frontend && npm ci
+
+COPY frontend/ ./frontend/
+
+# Builds the SPA into /app/mysterium/static (FastAPI serves it at /ui)
+RUN cd frontend && npm run build
+
 # ── Build stage ─────────────────────────────────────────────────────
 FROM python:3.13-slim AS builder
 
@@ -24,6 +38,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Copy application code
 COPY main.py ./
 COPY mysterium/ ./mysterium/
+
+# Overwrite any checked-in static assets with the freshly built frontend bundle
+COPY --from=frontend /app/mysterium/static ./mysterium/static/
 
 USER mysterium
 

@@ -155,6 +155,28 @@ service:
 kill-service:
 	@pkill -f "uvicorn mysterium.main:app" && echo "Service stopped" || echo "No service running"
 
+# ── Frontend (Svelte + Vite) ────────────────────────────────────────
+
+## Install frontend dependencies (requires Node/npm)
+ui-install:
+	cd frontend && npm install
+
+## Build the frontend bundle into mysterium/static (requires Node/npm)
+ui-build:
+	cd frontend && npm run build
+
+## Run the frontend dev server with HMR (proxies /api to localhost:8200)
+ui-dev:
+	cd frontend && npm run dev
+
+## Type-check the frontend
+ui-check:
+	cd frontend && npm run check
+
+## Run frontend unit tests
+ui-test:
+	cd frontend && npm test
+
 # ── Help ────────────────────────────────────────────────────────────
 
 ## Show all targets and descriptions

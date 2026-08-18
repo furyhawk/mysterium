@@ -83,8 +83,8 @@ Open **http://localhost:8200** in your browser.
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │   Browser   │────▶│  Mysterium   │────▶│ verity-rag  │
-│   (Vanilla  │     │  (FastAPI)   │     │ (RAG server)│
-│    SPA)     │◀────│              │◀────│             │
+│   (Svelte   │     │  (FastAPI)   │     │ (RAG server)│
+│     SPA)    │◀────│              │◀────│             │
 └─────────────┘     │   +─────────┤     └─────────────┘
                     │   │pydantic- │
                     │   │deep agent│
@@ -95,7 +95,7 @@ Open **http://localhost:8200** in your browser.
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Frontend** | Static HTML + CSS + JS (no build step) | Upload, search, research UI |
+| **Frontend** | [Svelte 5](https://svelte.dev) + Vite + TypeScript, [shadcn-svelte](https://shadcn-svelte.com) (Bits UI + Tailwind) | Upload, search, research UI — compiled to `mysterium/static`, served by FastAPI at `/ui` |
 | **API Gateway** | FastAPI | Proxies document operations to verity-rag; hosts research agent |
 | **RAG Engine** | [verity-rag](https://pypi.org/project/verity-rag/) | Document ingestion, chunking, embedding, hybrid search (Milvus + BM25) |
 | **Research Agent** | [pydantic-deep](https://github.com/vstorm-co/pydantic-deepagents) | Structured report synthesis from RAG context + LLM analysis |
@@ -185,6 +185,38 @@ uv run uvicorn mysterium.main:app --reload --port 8200
 # Or using the module directly
 uv run python -m mysterium.main
 ```
+
+## Frontend Development
+
+The browser UI lives in [`frontend/`](frontend/) — a [Svelte 5](https://svelte.dev) +
+[Vite](https://vite.dev) + TypeScript app styled with
+[shadcn-svelte](https://shadcn-svelte.com) (Bits UI + Tailwind CSS v4). The
+production bundle is compiled straight into `mysterium/static/`, which FastAPI
+already mounts at `/ui` — so no backend changes are needed to serve it.
+
+> A built bundle is committed in `mysterium/static/`, so `uv run` works out of
+> the box. Rebuild it after editing frontend sources.
+
+```bash
+# Install dependencies (first time)
+cd frontend && npm install
+
+# Build the production bundle into ../mysterium/static
+npm run build
+
+# Dev server with HMR — proxies /api to http://localhost:8200
+npm run dev
+
+# Type-check (svelte-check) and unit tests
+npm run check
+npm test
+```
+
+Or use the Makefile shortcuts: `make ui-install`, `make ui-build`, `make ui-dev`,
+`make ui-check`, `make ui-test`.
+
+> The Docker image builds the frontend automatically in a Node stage, so the
+> container always ships a freshly built bundle.
 
 ## How It Uses the Libraries
 

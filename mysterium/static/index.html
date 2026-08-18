@@ -40,6 +40,12 @@
         </svg>
         Chat
       </button>
+      <button class="nav-tab" data-tab="history">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+        History
+      </button>
     </div>
     <div class="nav-status" id="navStatus"></div>
     <div class="nav-version" id="appVersion">v0.2.1</div>
@@ -243,6 +249,12 @@
             </svg>
             New conversation
           </button>
+          <button class="btn btn-sm chat-export-btn" id="chatExport" title="Download this conversation as Markdown">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </button>
         </div>
 
         <div id="chatMessages" class="chat-messages">
@@ -262,6 +274,28 @@
             </svg>
             Send
           </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── History Tab ─── -->
+    <section class="tab-panel" id="tab-history">
+      <div class="card">
+        <div class="history-toolbar">
+          <h2 class="card-title">Saved Research Reports</h2>
+          <button class="btn btn-sm" id="refreshHistory" title="Reload history">⟳ Refresh</button>
+        </div>
+        <p class="card-desc">Reports are saved automatically after generation.</p>
+        <div id="historyReports" class="history-list">
+          <div class="empty-state">No saved reports yet.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Saved Conversations</h2>
+        <p class="card-desc">Chat transcripts are saved automatically. Open one to continue it.</p>
+        <div id="historyChats" class="history-list">
+          <div class="empty-state">No saved conversations yet.</div>
         </div>
       </div>
     </section>

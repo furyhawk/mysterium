@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,6 +32,7 @@ from pydantic import BaseModel, Field
 from mysterium.agents.chat import ChatMessage, run_chat_response, stream_chat_response
 from mysterium.clients.rag_client import RAGClient
 from mysterium.config import Settings, get_settings
+from mysterium.history import HistoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,15 @@ class ChatRequest(BaseModel):
         description=(
             "Prior conversation history (excluding `message`). The client "
             "owns the conversation; the server is stateless."
+        ),
+    )
+    conversation_id: str | None = Field(
+        default=None,
+        description=(
+            "Stable id for this conversation, used to persist the transcript "
+            "server-side. Omit to start a new conversation — the server "
+            "assigns an id and returns it in the response so later turns can "
+            "continue the same transcript."
         ),
     )
     collection_name: str = "documents"
@@ -178,6 +189,27 @@ async def chat_stream(
                         }
                     )
                     return
+                # Persist the turn (non-fatal) and surface the conversation id
+                # so the client can continue the same transcript later.
+                if event["type"] == "message":
+                    message = event["message"]
+                    conversation_id = body.conversation_id or uuid.uuid4().hex
+                    HistoryStore(
+                        root=settings.data_dir,
+                        enabled=settings.history_enabled,
+                    ).append_chat(
+                        conversation_id,
+                        user_message=body.message,
+                        assistant_message=message,
+                        collection_name=body.collection_name,
+                    )
+                    event = {
+                        **event,
+                        "message": {
+                            **message,
+                            "conversation_id": conversation_id,
+                        },
+                    }
                 yield _sse(event)
         except Exception as e:
             # Keep the stream alive with an error event so the client can
@@ -236,7 +268,18 @@ async def chat(
                 status_code=502,
                 detail="Model returned an empty answer; please retry.",
             )
-        return result
+        # Persist the turn (non-fatal) and surface the conversation id so the
+        # client can continue the same transcript on later turns.
+        conversation_id = body.conversation_id or uuid.uuid4().hex
+        HistoryStore(
+            root=settings.data_dir, enabled=settings.history_enabled
+        ).append_chat(
+            conversation_id,
+            user_message=body.message,
+            assistant_message=result,
+            collection_name=body.collection_name,
+        )
+        return {**result, "conversation_id": conversation_id}
     except HTTPException:
         raise
     except Exception as e:

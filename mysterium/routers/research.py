@@ -23,6 +23,7 @@ from mysterium.agents import generate_research_report
 from mysterium.agents import stream_research_report as stream_report_generation
 from mysterium.clients.rag_client import RAGClient
 from mysterium.config import Settings, get_settings
+from mysterium.history import HistoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,18 @@ async def create_research_report(
                 status_code=502,
                 detail="Model returned an empty report; please retry.",
             )
+        # Persist the finished report (non-fatal) and surface its id so the
+        # UI can link to the history entry.
+        record = HistoryStore(
+            root=settings.data_dir, enabled=settings.history_enabled
+        ).save_report(
+            report,
+            query=body.query,
+            collection_name=body.collection_name,
+            model=body.model,
+        )
+        if record is not None:
+            report = {**report, "report_id": record["report_id"]}
         return report
     except Exception as e:
         raise HTTPException(
@@ -218,6 +231,26 @@ async def create_research_report_stream(
                             }
                         )
                         return
+                    # Persist the finished report (non-fatal) and surface its
+                    # id so the UI can link to the history entry.
+                    report = event["report"]
+                    record = HistoryStore(
+                        root=settings.data_dir,
+                        enabled=settings.history_enabled,
+                    ).save_report(
+                        report,
+                        query=body.query,
+                        collection_name=body.collection_name,
+                        model=body.model,
+                    )
+                    if record is not None:
+                        event = {
+                            **event,
+                            "report": {
+                                **report,
+                                "report_id": record["report_id"],
+                            },
+                        }
                     yield _sse(event)
                 else:
                     yield _sse(event)

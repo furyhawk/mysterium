@@ -38,6 +38,10 @@ services:
       HOST: "0.0.0.0"
       PORT: "8200"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
+      DATA_DIR: "${DATA_DIR:-/data}"
+      HISTORY_ENABLED: "${HISTORY_ENABLED:-true}"
+    volumes:
+      - mysterium-data:/data
     networks:
       - mysterium-net
 
@@ -158,6 +162,7 @@ volumes:
   valkey-data:
   milvus-data:
   rag-data:
+  mysterium-data:
 
 # ── Networks ─────────────────────────────────────────────────────────
 networks:

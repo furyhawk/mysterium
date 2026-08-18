@@ -123,6 +123,30 @@
     return d.innerHTML;
   }
 
+  // Downloads a file from a URL that returns a Content-Disposition attachment.
+  async function downloadFile(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Download failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      const name = match ? match[1] : 'export';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  }
+
   // ── Tab Switching ─────────────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -424,13 +448,22 @@
       <div class="research-report">
         <div class="report-toolbar">
           <span class="report-title">${escapeHtml(report.title)}</span>
-          <button class="btn btn-sm copy-btn" title="Copy as Markdown">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-            </svg>
-            Copy Markdown
-          </button>
+          <div class="report-toolbar-actions">
+            ${report.report_id ? `<span class="report-saved" title="Saved to history">✓ Saved</span>` : ''}
+            <button class="btn btn-sm copy-btn" title="Copy as Markdown">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+              Copy Markdown
+            </button>
+            <button class="btn btn-sm download-btn" title="Download as Markdown">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              Download
+            </button>
+          </div>
         </div>
         ${report.summary ? `<div class="report-summary">${escapeHtml(report.summary).replace(/\n/g, '<br/>')}</div>` : ''}
         ${images ? `<h3 style="margin-bottom:8px">🖼️ Images</h3><div class="report-images">${images}</div>` : ''}
@@ -463,6 +496,19 @@
           toast('Failed to copy — browser may not support clipboard API', 'error');
         }
       });
+    }
+
+    // Download-as-Markdown handler (only when the report was persisted).
+    const downloadBtn = container.querySelector('.download-btn');
+    if (downloadBtn) {
+      if (report.report_id) {
+        downloadBtn.addEventListener('click', () => {
+          downloadFile(`/api/history/reports/${encodeURIComponent(report.report_id)}/export?format=md`);
+        });
+      } else {
+        downloadBtn.disabled = true;
+        downloadBtn.title = 'This report was not saved to history';
+      }
     }
   }
 
@@ -541,6 +587,7 @@
   // streamed bubble with a collapsible "Sources" list.
   const chatState = {
     messages: [],  // [{role, content}] — history sent to the backend
+    conversationId: null,  // persisted transcript id; null = new conversation
     busy: false,
   };
 
@@ -964,6 +1011,7 @@
         message: text,
         // History excludes the new message — the backend appends it.
         messages: chatState.messages.slice(0, -1),
+        conversation_id: chatState.conversationId,
         collection_name: els.chatCollection.value,
         limit: parseInt(els.chatLimit.value) || 5,
         model: els.chatModel.value,
@@ -992,6 +1040,10 @@
       if (final.sources && final.sources.length) {
         renderChatSources(contentEl, final.sources);
       }
+      // Remember the transcript id so follow-ups append to the same file.
+      if (final.conversation_id) {
+        chatState.conversationId = final.conversation_id;
+      }
       chatState.messages.push({
         role: 'assistant',
         content: final.content || full,
@@ -1011,6 +1063,7 @@
 
   function clearChat() {
     chatState.messages = [];
+    chatState.conversationId = null;
     els.chatMessages.innerHTML = '';
     const empty = document.createElement('div');
     empty.className = 'chat-empty';
@@ -1027,6 +1080,143 @@
   function autoGrowChatInput() {
     els.chatInput.style.height = 'auto';
     els.chatInput.style.height = Math.min(els.chatInput.scrollHeight, 160) + 'px';
+  }
+
+  // ── History ───────────────────────────────────────────────────────
+  async function loadHistory() {
+    loadHistoryReports();
+    loadHistoryChats();
+  }
+
+  async function loadHistoryReports() {
+    const container = els.historyReports;
+    try {
+      const data = await API.get('/api/history/reports');
+      const items = data.items || [];
+      if (!items.length) {
+        container.innerHTML = '<div class="empty-state">No saved reports yet.</div>';
+        return;
+      }
+      container.innerHTML = items.map(r => `
+        <div class="history-item">
+          <div class="history-info">
+            <div class="history-title">${escapeHtml(r.title)}</div>
+            <div class="history-meta">
+              ${escapeHtml(r.query || '')}
+              ${r.model ? ' · ' + escapeHtml(r.model) : ''}
+              ${r.saved_at ? ' · ' + new Date(r.saved_at).toLocaleString() : ''}
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="btn btn-sm" data-action="open" data-id="${escapeHtml(r.id)}">Open</button>
+            <button class="btn btn-sm" data-action="download" data-id="${escapeHtml(r.id)}">⬇ MD</button>
+            <button class="btn btn-sm btn-danger-ghost" data-action="delete" data-id="${escapeHtml(r.id)}">🗑</button>
+          </div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (btn.dataset.action === 'open') {
+            try {
+              const report = await API.get(`/api/history/reports/${encodeURIComponent(id)}`);
+              switchTab('research');
+              renderReport(report, els.researchResults);
+            } catch (e) { toast(e.message, 'error'); }
+          } else if (btn.dataset.action === 'download') {
+            downloadFile(`/api/history/reports/${encodeURIComponent(id)}/export?format=md`);
+          } else if (btn.dataset.action === 'delete') {
+            if (!confirm('Delete this saved report?')) return;
+            try {
+              const res = await fetch(`/api/history/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
+              if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+              toast('Report deleted', 'success');
+              loadHistoryReports();
+            } catch (e) { toast(e.message, 'error'); }
+          }
+        });
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="error-state">Failed to load history: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function loadHistoryChats() {
+    const container = els.historyChats;
+    try {
+      const data = await API.get('/api/history/chats');
+      const items = data.items || [];
+      if (!items.length) {
+        container.innerHTML = '<div class="empty-state">No saved conversations yet.</div>';
+        return;
+      }
+      container.innerHTML = items.map(c => `
+        <div class="history-item">
+          <div class="history-info">
+            <div class="history-title">${escapeHtml(c.title)}</div>
+            <div class="history-meta">
+              ${c.message_count} messages
+              ${c.collection_name ? ' · ' + escapeHtml(c.collection_name) : ''}
+              ${c.updated_at ? ' · ' + new Date(c.updated_at).toLocaleString() : ''}
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="btn btn-sm" data-action="open" data-id="${escapeHtml(c.id)}">Open</button>
+            <button class="btn btn-sm" data-action="download" data-id="${escapeHtml(c.id)}">⬇ MD</button>
+            <button class="btn btn-sm btn-danger-ghost" data-action="delete" data-id="${escapeHtml(c.id)}">🗑</button>
+          </div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (btn.dataset.action === 'open') {
+            await openSavedChat(id);
+          } else if (btn.dataset.action === 'download') {
+            downloadFile(`/api/history/chats/${encodeURIComponent(id)}/export?format=md`);
+          } else if (btn.dataset.action === 'delete') {
+            if (!confirm('Delete this saved conversation?')) return;
+            try {
+              const res = await fetch(`/api/history/chats/${encodeURIComponent(id)}`, { method: 'DELETE' });
+              if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+              toast('Conversation deleted', 'success');
+              loadHistoryChats();
+            } catch (e) { toast(e.message, 'error'); }
+          }
+        });
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="error-state">Failed to load history: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  // Restores a saved conversation into the chat tab. Follow-ups continue
+  // appending to the same transcript on the server.
+  async function openSavedChat(id) {
+    try {
+      const chat = await API.get(`/api/history/chats/${encodeURIComponent(id)}`);
+      switchTab('chat');
+      clearChat();
+      chatState.conversationId = chat.id || id;
+      const messages = chat.messages || [];
+      for (const m of messages) {
+        if (m.role === 'user') {
+          chatState.messages.push({ role: 'user', content: m.content || '' });
+          addChatMessage('user', m.content || '');
+        } else {
+          const contentEl = createAssistantBubble();
+          contentEl.innerHTML = renderMarkdown(m.content || '');
+          if (m.images && m.images.length) renderChatImages(contentEl, m.images);
+          if (m.sources && m.sources.length) renderChatSources(contentEl, m.sources);
+          chatState.messages.push({ role: 'assistant', content: m.content || '' });
+        }
+      }
+      chatScrollToBottom();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
   }
 
   // ── Initialization ────────────────────────────────────────────────
@@ -1085,12 +1275,33 @@
       chatInput: document.getElementById('chatInput'),
       chatSendBtn: document.getElementById('chatSendBtn'),
       chatEmpty: document.getElementById('chatEmpty'),
+      chatExport: document.getElementById('chatExport'),
+      historyReports: document.getElementById('historyReports'),
+      historyChats: document.getElementById('historyChats'),
+      refreshHistory: document.getElementById('refreshHistory'),
     };
 
     // Tab switching
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
+
+    // History: load on startup + manual refresh
+    loadHistory();
+    if (els.refreshHistory) {
+      els.refreshHistory.addEventListener('click', loadHistory);
+    }
+
+    // Chat: export the current transcript as Markdown
+    if (els.chatExport) {
+      els.chatExport.addEventListener('click', () => {
+        if (!chatState.conversationId) {
+          toast('This conversation has not been saved yet — send a message first', 'error');
+          return;
+        }
+        downloadFile(`/api/history/chats/${encodeURIComponent(chatState.conversationId)}/export?format=md`);
+      });
+    }
 
     // Upload zone: click to select
     els.uploadZone.addEventListener('click', () => els.fileInput.click());

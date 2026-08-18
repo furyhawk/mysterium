@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     # Maximum file upload size via our proxy (bytes)
     max_upload_size: int = 50 * 1024 * 1024  # 50MB
 
+    # History persistence — save research reports & chat transcripts to disk.
+    # `data_dir` is the root directory (a docker volume is mounted here in
+    # the container). `history_enabled=False` disables saving and makes the
+    # /api/history endpoints return empty lists / 404s.
+    data_dir: str = "./data"
+    history_enabled: bool = True
+
 
 def get_settings() -> Settings:
     """FastAPI dependency that returns application settings."""

@@ -1,0 +1,56 @@
+/*
+ * GitHub Dark theme — design tokens.
+ *
+ * Plain CSS custom properties targeting :root. These override the shadcn-svelte
+ * token names referenced by the base stylesheet, so every component adapts
+ * automatically. Loaded as its own asset from <base>themes/github-dark/theme.css
+ * (see vite.config.ts + src/themes/registry.ts).
+ */
+:root {
+	--background: #0d1117;
+	--foreground: #e6edf3;
+
+	--card: #161b22;
+	--card-foreground: #e6edf3;
+
+	--popover: #161b22;
+	--popover-foreground: #e6edf3;
+
+	--primary: #388bfd;
+	--primary-foreground: #ffffff;
+
+	--secondary: #21262d;
+	--secondary-foreground: #e6edf3;
+
+	--muted: #21262d;
+	--muted-foreground: #8b949e;
+
+	--accent: #30363d;
+	--accent-foreground: #e6edf3;
+
+	--destructive: #da3633;
+	--destructive-foreground: #ffffff;
+
+	--border: #30363d;
+	--input: #30363d;
+	--ring: #388bfd;
+
+	--chart-1: #388bfd;
+	--chart-2: #3fb950;
+	--chart-3: #d29922;
+	--chart-4: #f85149;
+	--chart-5: #a371f7;
+
+	--radius: 0.625rem;
+
+	--sidebar: #161b22;
+	--sidebar-foreground: #e6edf3;
+	--sidebar-primary: #388bfd;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #21262d;
+	--sidebar-accent-foreground: #e6edf3;
+	--sidebar-border: #30363d;
+	--sidebar-ring: #388bfd;
+
+	color-scheme: dark;
+}

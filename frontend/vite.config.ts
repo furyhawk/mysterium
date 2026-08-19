@@ -19,6 +19,20 @@ export default defineConfig({
     outDir: fileURLToPath(new URL('../mysterium/static', import.meta.url)),
     emptyOutDir: true,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Each theme's stylesheet (imported via `?url` in themes/registry.ts)
+        // is emitted into its OWN folder so themes stay independent and
+        // loadable at <base>themes/<id>/theme.css. Everything else keeps the
+        // default hashed assets layout.
+        assetFileNames: (assetInfo) => {
+          const src = assetInfo.originalFileNames?.[0] ?? '';
+          const match = src.match(/[\\/]themes[\\/]([^\\/]+)[\\/]theme\.css$/);
+          if (match) return `themes/${match[1]}/theme.css`;
+          return 'assets/[name]-[hash][extname]';
+        },
+      },
+    },
   },
   server: {
     port: 5173,

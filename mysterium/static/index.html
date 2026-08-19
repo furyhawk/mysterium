@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link
@@ -8,10 +8,31 @@
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🔬</text></svg>"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
     <title>Mysterium — RAG Research Platform</title>
-    <script type="module" crossorigin src="/ui/assets/index-BHCdQlJ5.js"></script>
-    <link rel="stylesheet" crossorigin href="/ui/assets/index-GXnzxjU6.css">
+    <script>
+      // Apply the persisted theme before first paint to avoid a flash of the
+      // wrong palette. Kept dependency-free; main.ts reuses the same <link>.
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('mysterium.theme') || 'null');
+          var id = (saved && saved.themeId) || 'github-dark';
+          var mode = saved && saved.mode === 'light' ? 'light' : 'dark';
+          var root = document.documentElement;
+          root.dataset.theme = id;
+          root.classList.toggle('dark', mode === 'dark');
+          root.style.colorScheme = mode;
+          var link = document.createElement('link');
+          link.id = 'theme-stylesheet';
+          link.rel = 'stylesheet';
+          link.href = new URL('themes/' + id + '/theme.css', document.baseURI).href;
+          document.head.appendChild(link);
+        } catch (e) {
+          /* noop — the app falls back to the default theme */
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/ui/assets/index-DdnYcrpb.js"></script>
+    <link rel="stylesheet" crossorigin href="/ui/assets/index-GGWZih8H.css">
   </head>
   <body>
     <div id="app"></div>

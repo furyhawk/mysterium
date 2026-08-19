@@ -5,7 +5,9 @@
 	import PenLineIcon from '@lucide/svelte/icons/pen-line';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import HistoryIcon from '@lucide/svelte/icons/history';
+	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import { Toaster } from '$lib/components/ui/sonner/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import {
 		app,
 		loadVersion,
@@ -13,6 +15,8 @@
 		setTab,
 		type TabId,
 	} from '$lib/app/store.svelte';
+	import { themeState, setTheme } from '$lib/app/theme.svelte';
+	import { themes } from './themes/registry';
 	import UploadTab from './components/UploadTab.svelte';
 	import SearchTab from './components/SearchTab.svelte';
 	import ResearchTab from './components/ResearchTab.svelte';
@@ -32,6 +36,19 @@
 		{ id: 'chat', label: 'Chat', icon: MessageSquareIcon },
 		{ id: 'history', label: 'History', icon: HistoryIcon },
 	];
+
+	// Theme picker selection (kept in sync with the global theme store).
+	let selectedTheme = $state(themeState.themeId);
+
+	// Sync the picker when the theme is changed from elsewhere (e.g. reset).
+	$effect(() => {
+		selectedTheme = themeState.themeId;
+	});
+
+	// Apply picker changes to the app-wide theme.
+	$effect(() => {
+		if (selectedTheme !== themeState.themeId) setTheme(selectedTheme);
+	});
 
 	onMount(() => {
 		loadVersion();
@@ -66,6 +83,25 @@
 				{/each}
 			</nav>
 
+			<Select.Root type="single" bind:value={selectedTheme}>
+				<Select.Trigger
+					size="sm"
+					class="h-8 shrink-0 gap-1.5 px-2"
+					aria-label="Theme"
+					title="Theme"
+				>
+					<PaletteIcon class="size-4 text-muted-foreground" />
+					<span class="flex-1 text-left">
+						{themes.find((t) => t.id === selectedTheme)?.label ?? selectedTheme}
+					</span>
+				</Select.Trigger>
+				<Select.Content align="end">
+					{#each themes as t}
+						<Select.Item value={t.id} label={t.label}>{t.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+
 			{#if app.navStatus}
 				<span class="hidden shrink-0 text-xs text-muted-foreground lg:inline">
 					{app.navStatus}
@@ -91,5 +127,5 @@
 		{/if}
 	</main>
 
-	<Toaster theme="dark" richColors />
+	<Toaster richColors />
 </div>

@@ -5,9 +5,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Mysterium theme ────────────────────────────────────────────────
-   Dark-only design system (GitHub-dark palette), exposed as shadcn-svelte
-   design tokens so the generated components pick it up automatically.
+/* ── Design tokens ─────────────────────────────────────────────────
+   The values below are the FALLBACK/default palette (GitHub Dark) so the
+   app always renders correctly. The active palette comes from whichever
+   theme is selected — each theme ships its own `theme.css` under
+   `src/themes/<id>/`, loaded as a standalone stylesheet from its own folder
+   (see src/themes/registry.ts). Add a new folder to add a theme.
 */
 :root {
   --background: #0d1117;
@@ -56,42 +59,6 @@
   --sidebar-ring: #388bfd;
 
   color-scheme: dark;
-}
-
-/* Keep everything dark even if a script toggles the `.dark` class. */
-.dark {
-  --background: #0d1117;
-  --foreground: #e6edf3;
-  --card: #161b22;
-  --card-foreground: #e6edf3;
-  --popover: #161b22;
-  --popover-foreground: #e6edf3;
-  --primary: #388bfd;
-  --primary-foreground: #ffffff;
-  --secondary: #21262d;
-  --secondary-foreground: #e6edf3;
-  --muted: #21262d;
-  --muted-foreground: #8b949e;
-  --accent: #30363d;
-  --accent-foreground: #e6edf3;
-  --destructive: #da3633;
-  --destructive-foreground: #ffffff;
-  --border: #30363d;
-  --input: #30363d;
-  --ring: #388bfd;
-  --chart-1: #388bfd;
-  --chart-2: #3fb950;
-  --chart-3: #d29922;
-  --chart-4: #f85149;
-  --chart-5: #a371f7;
-  --sidebar: #161b22;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-primary: #388bfd;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #21262d;
-  --sidebar-accent-foreground: #e6edf3;
-  --sidebar-border: #30363d;
-  --sidebar-ring: #388bfd;
 }
 
 @theme inline {

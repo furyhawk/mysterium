@@ -9,10 +9,15 @@ TypeScript app styled with [shadcn-svelte](https://shadcn-svelte.com) (Bits UI +
   switching (no router dependency).
 - **Shared stores** (`src/lib/app/store.svelte.ts`, `src/lib/chat/store.svelte.ts`): Svelte 5
   runes at module scope, exposed through action functions.
+- **Themes** (`src/themes/`): a multi-theme system. Each theme is a self-contained folder with
+  its own `theme.css`, compiled to a standalone stylesheet served from its own path
+  (`<base>themes/<id>/theme.css`). Themes are auto-discovered; add a folder to add a theme.
+  See `src/themes/README.md`.
 - **API layer** (`src/lib/api`): typed REST client + a generic Server-Sent Events helper used by
   both the research report stream and the chat stream.
 - **Markdown** (`src/lib/markdown`): a self-contained, XSS-safe renderer and a report exporter.
 - **Build output** is written straight into `../mysterium/static/`, which FastAPI mounts at `/ui`.
+  Theme stylesheets are emitted to `../mysterium/static/themes/<id>/theme.css`.
 
 ## Scripts
 
@@ -44,8 +49,13 @@ src/
     api/                     # types, REST client, SSE streaming helper
     markdown/                # XSS-safe markdown renderer + report exporter
     app/store.svelte.ts      # global app state (tab, version, collections, ...)
+    app/theme.svelte.ts      # theme manager (selection, persistence, DOM apply)
     chat/store.svelte.ts     # chat conversation state
     components/ui/           # shadcn-svelte components (generated)
+  themes/                    # multi-theme system (see themes/README.md)
+    registry.ts              # auto-discovers themes + their CSS assets
+    <theme-id>/index.ts      # theme metadata
+    <theme-id>/theme.css     # design tokens for that theme
 ```
 
 ## Key Svelte 5 notes

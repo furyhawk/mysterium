@@ -11,7 +11,14 @@ dependencies = [
     # >=2.18.0 required for the local WebFetch(native=False, local=True)
     # capability (markdownify-based local web-fetch tool).
     "markdownify>=1.2",
-    "pydantic-ai-slim>=2.18.0",
+    # <2.32.0: pydantic-ai-slim 2.32+ migrated from `httpx` to `httpx2`. The
+    # anthropic SDK (as of 0.125.x) still validates `http_client` against the
+    # old `httpx.AsyncClient`, so a httpx2 client passed to AsyncAnthropic
+    # fails with "Invalid `http_client` argument; Expected an instance of
+    # `httpx.AsyncClient` but got <class 'httpx2.AsyncClient'>". Keep the
+    # whole agent stack on `httpx` until the anthropic SDK supports httpx2
+    # (anthropic>=1.0.0) or pydantic-ai bridges the two.
+    "pydantic-ai-slim>=2.18.0,<2.32.0",
     "pydantic-deep>=0.3.20",
     "pydantic-settings>=2.14.2",
     "uvicorn>=0.51.0",

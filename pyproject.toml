@@ -31,3 +31,10 @@ package = true
 
 [project.scripts]
 mysterium = "mysterium.main:main"
+
+# Restrict package discovery to the `mysterium` package only. Without this,
+# setuptools' flat-layout auto-discovery also picks up `frontend/` (and other
+# top-level dirs) as candidate packages and fails the build with
+# "Multiple top-level packages discovered in a flat-layout".
+[tool.setuptools.packages.find]
+include = ["mysterium*"]

@@ -5,24 +5,31 @@ description = "RAG-powered research platform — upload documents, search with v
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "anthropic>=0.117.0",
+    # >=1.0.0: anthropic migrated from `httpx` to `httpx2` (the pydantic fork)
+    # in 1.0.0. It validates `http_client` against `httpx2.AsyncClient`, so it
+    # must be paired with a pydantic-ai on the same httpx2 line (>=2.32.0).
+    "anthropic>=1.0.0",
     "fastapi==0.115.6",
     "httpx>=0.28.1",
     # >=2.18.0 required for the local WebFetch(native=False, local=True)
     # capability (markdownify-based local web-fetch tool).
     "markdownify>=1.2",
-    # <2.32.0: pydantic-ai-slim 2.32+ migrated from `httpx` to `httpx2`. The
-    # anthropic SDK (as of 0.125.x) still validates `http_client` against the
-    # old `httpx.AsyncClient`, so a httpx2 client passed to AsyncAnthropic
-    # fails with "Invalid `http_client` argument; Expected an instance of
-    # `httpx.AsyncClient` but got <class 'httpx2.AsyncClient'>". Keep the
-    # whole agent stack on `httpx` until the anthropic SDK supports httpx2
-    # (anthropic>=1.0.0) or pydantic-ai bridges the two.
-    "pydantic-ai-slim>=2.18.0,<2.32.0",
+    # >=2.32.0: pydantic-ai-slim migrated from `httpx` to `httpx2` in 2.32.0.
+    # This is the httpx2 line, paired with anthropic>=1.0.0 (also httpx2).
+    # Mixing an httpx-based pydantic-ai with an httpx2-based anthropic (or
+    # vice versa) breaks agent construction with:
+    #   Invalid `http_client` argument; Expected an instance of
+    #   `httpx.AsyncClient` but got <class 'httpx2.AsyncClient'>
+    "pydantic-ai-slim>=2.32.0",
     "pydantic-deep>=0.3.20",
     "pydantic-settings>=2.14.2",
     "uvicorn>=0.51.0",
-    "verity-rag>=0.2.0",
+    # <0.2.2: verity-rag 0.2.2 added `marker-pdf`, which pins `anthropic<1`.
+    # That conflicts with anthropic>=1.0.0, so uv resolves back to 0.2.0.
+    # The mysterium app talks to the RAG server over HTTP (never imports the
+    # `verity_rag` package), so the cap is safe. Revisit if marker-pdf drops
+    # the anthropic<1 pin.
+    "verity-rag>=0.2.0,<0.2.2",
 ]
 
 [project.urls]

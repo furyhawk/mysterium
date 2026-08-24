@@ -973,7 +973,7 @@ requires-dist = [
     { name = "pydantic-deep", specifier = ">=0.3.20" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "uvicorn", specifier = ">=0.51.0" },
-    { name = "verity-rag", specifier = ">=0.2.0,<0.2.2" },
+    { name = "verity-rag", specifier = ">=0.2.0" },
 ]
 
 [[package]]

@@ -24,12 +24,13 @@ dependencies = [
     "pydantic-deep>=0.3.20",
     "pydantic-settings>=2.14.2",
     "uvicorn>=0.51.0",
-    # <0.2.2: verity-rag 0.2.2 added `marker-pdf`, which pins `anthropic<1`.
-    # That conflicts with anthropic>=1.0.0, so uv resolves back to 0.2.0.
-    # The mysterium app talks to the RAG server over HTTP (never imports the
-    # `verity_rag` package), so the cap is safe. Revisit if marker-pdf drops
-    # the anthropic<1 pin.
-    "verity-rag>=0.2.0,<0.2.2",
+    # verity-rag. The mysterium app talks to the RAG server over HTTP and never
+    # imports the `verity_rag` package. NOTE: latest (0.2.2) pulls marker-pdf,
+    # which requires markdownify<0.14 — that conflicts with markdownify>=1.2
+    # (needed for pydantic-ai's local WebFetch tool), so uv resolves 0.2.0.
+    # Revisit when a verity-rag release drops that marker-pdf/markdownify
+    # conflict.
+    "verity-rag>=0.2.0",
 ]
 
 [project.urls]

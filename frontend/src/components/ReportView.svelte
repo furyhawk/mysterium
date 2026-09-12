@@ -3,14 +3,20 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import type { ResearchReport } from '$lib/api/types';
+	import type { ResearchReport, ReportImage } from '$lib/api/types';
 	import { reportToMarkdown } from '$lib/markdown/export';
 	import { downloadFile } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
 
 	let { report }: { report: ResearchReport } = $props();
 
 	let copied = $state(false);
+	let lightbox = $state<ReportImage | null>(null);
+
+	function openLightbox(im: ReportImage) {
+		lightbox = im;
+	}
 
 	const md = $derived(reportToMarkdown(report));
 
@@ -74,14 +80,21 @@
 	{#if report.images?.length}
 		<h3 class="mb-2 mt-4 text-sm font-semibold">🖼️ Images</h3>
 		<div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-			{#each report.images as im}
+			{#each report.images as im (im.image_id)}
 				<figure class="min-w-0">
-					<img
-						src={`/api/images/${encodeURIComponent(im.image_id)}`}
-						alt={im.description || 'Report image'}
-						loading="lazy"
-						class="w-full rounded-md border border-border"
-					/>
+					<button
+						type="button"
+						class="block w-full cursor-zoom-in overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						title="Click to enlarge"
+						onclick={() => openLightbox(im)}
+					>
+						<img
+							src={`/api/images/${encodeURIComponent(im.image_id)}`}
+							alt={im.description || 'Report image'}
+							loading="lazy"
+							class="w-full"
+						/>
+					</button>
 					{#if im.description}
 						<figcaption class="mt-1 text-xs text-muted-foreground">
 							{im.description}
@@ -142,3 +155,26 @@
 		</p>
 	{/if}
 </div>
+
+<Dialog.Root
+	open={lightbox !== null}
+	onOpenChange={(o) => {
+		if (!o) lightbox = null;
+	}}
+>
+	<Dialog.Content class="max-w-3xl" showCloseButton={false}>
+		{#if lightbox}
+			<img
+				src={`/api/images/${encodeURIComponent(lightbox.image_id)}`}
+				alt={lightbox.description || 'Report image'}
+				class="max-h-[80vh] w-full rounded-md object-contain"
+			/>
+			{#if lightbox.description}
+				<p class="text-sm text-muted-foreground">
+					{lightbox.description}
+					{#if lightbox.page_num != null} — p.{lightbox.page_num}{/if}
+				</p>
+			{/if}
+		{/if}
+	</Dialog.Content>
+</Dialog.Root>

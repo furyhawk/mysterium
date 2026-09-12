@@ -77,12 +77,15 @@
 		if (!o) lightbox = null;
 	}}
 >
-	<Dialog.Content class="max-w-3xl" showCloseButton={false}>
+	<Dialog.Content
+		class="w-[92vw] max-w-[92vw] p-3 sm:max-w-6xl"
+		showCloseButton={false}
+	>
 		{#if lightbox}
 			<img
 				src={`/api/images/${encodeURIComponent(lightbox.image_id)}`}
 				alt={lightbox.description || 'Document image'}
-				class="max-h-[80vh] w-full rounded-md object-contain"
+				class="mx-auto max-h-[85vh] w-full rounded-md object-contain"
 			/>
 			{#if lightbox.description}
 				<p class="text-sm text-muted-foreground">
